@@ -1,8 +1,6 @@
 ---
-title: Istio 可以将追踪信息发送到外部的 Zipkin 兼容实例后端吗？
-
+title: Istio 是否能发送追踪信息到外部与 Zipkin 兼容的后端？
 weight: 70
 ---
 
-为此，您必须使用 Zipkin 兼容实例的完全限定域名。
-例如：`zipkin.mynamespace.svc.cluster.local`。
+可以这么做，但是必须用 Zipkin 兼容实例的完全合格的域名。比如：`zipkin.mynamespace.svc.cluster.local`。

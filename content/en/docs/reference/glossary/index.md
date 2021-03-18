@@ -6,7 +6,8 @@ layout: glossary
 aliases:
   - /glossary
   - /docs/welcome/glossary.html
-  - /docs/reference/glossary.html
   - /help/glossary
 icon: glossary
+owner: istio/wg-docs-maintainers
+test: n/a
 ---

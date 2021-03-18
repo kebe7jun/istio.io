@@ -1,9 +1,10 @@
 ---
 title: Workload Instance
+test: n/a
 ---
-A single instantiation of a workload's binary.
-A workload instance can expose zero or more [service endpoints](#service-endpoint),
-and can consume zero or more [services](#service).
+A single instantiation of a [workload's](/docs/reference/glossary/#workload) binary.
+A workload instance can expose zero or more [service endpoints](/docs/reference/glossary/#service-endpoint),
+and can consume zero or more [services](/docs/reference/glossary/#service).
 
 Workload instances have a number of properties:
 
@@ -14,4 +15,4 @@ Workload instances have a number of properties:
 - Principal
 
 These properties are available in policy and telemetry configuration
-using the many [`source.*` and `destination.*` attributes](/docs/reference/config/policy-and-telemetry/attribute-vocabulary/).
+using the many [`source.*` and `destination.*` attributes](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/attribute-vocabulary/).

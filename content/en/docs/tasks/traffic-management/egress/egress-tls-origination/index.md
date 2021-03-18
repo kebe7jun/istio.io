@@ -3,13 +3,15 @@ title: Egress TLS Origination
 description: Describes how to configure Istio to perform TLS origination for traffic to external services.
 keywords: [traffic-management,egress]
 weight: 20
+owner: istio/wg-networking-maintainers
+test: yes
 aliases:
   - /docs/examples/advanced-gateways/egress-tls-origination/
 ---
 
-The [Control Egress Traffic](/docs/tasks/traffic-management/egress/) task demonstrates how external, i.e., outside of the
-service mesh, HTTP and HTTPS services can be accessed from applications inside the mesh. As described in that task,
-a [`ServiceEntry`](/docs/reference/config/networking/v1alpha3/service-entry/) is used to configure Istio
+The [Accessing External Services](/docs/tasks/traffic-management/egress/egress-control) task demonstrates how external,
+i.e., outside of the service mesh, HTTP and HTTPS services can be accessed from applications inside the mesh. As described
+in that task, a [`ServiceEntry`](/docs/reference/config/networking/service-entry/) is used to configure Istio
 to access external services in a controlled way.
 This example shows how to configure Istio to perform {{< gloss >}}TLS origination{{< /gloss >}}
 for traffic to an external service. Istio will open HTTPS connections to the external service while the original
@@ -55,12 +57,12 @@ is that Istio can produce better telemetry and provide more routing control for 
 ## Configuring access to an external service
 
 First start by configuring access to an external service, `edition.cnn.com`,
-using the same technique shown in the [Control Egress Traffic](/docs/tasks/traffic-management/egress/) task.
+using the same technique shown in the [Accessing External Services](/docs/tasks/traffic-management/egress/egress-control) task.
 This time, however, use a single `ServiceEntry` to enable both HTTP and HTTPS access to the service.
 
-1.  Create a `ServiceEntry` and `VirtualService` to enable access to `edition.cnn.com`:
+1.  Create a `ServiceEntry` to enable access to `edition.cnn.com`:
 
-    {{< text bash >}}
+    {{< text syntax=bash snip_id=apply_simple >}}
     $ kubectl apply -f - <<EOF
     apiVersion: networking.istio.io/v1alpha3
     kind: ServiceEntry
@@ -77,41 +79,19 @@ This time, however, use a single `ServiceEntry` to enable both HTTP and HTTPS ac
         name: https-port
         protocol: HTTPS
       resolution: DNS
-    ---
-    apiVersion: networking.istio.io/v1alpha3
-    kind: VirtualService
-    metadata:
-      name: edition-cnn-com
-    spec:
-      hosts:
-      - edition.cnn.com
-      tls:
-      - match:
-        - port: 443
-          sni_hosts:
-          - edition.cnn.com
-        route:
-        - destination:
-            host: edition.cnn.com
-            port:
-              number: 443
-          weight: 100
     EOF
     {{< /text >}}
 
 1.  Make a request to the external HTTP service:
 
-    {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - http://edition.cnn.com/politics
+    {{< text syntax=bash snip_id=curl_simple >}}
+    $ kubectl exec "${SOURCE_POD}" -c sleep -- curl -sSL -o /dev/null -D - http://edition.cnn.com/politics
     HTTP/1.1 301 Moved Permanently
     ...
     location: https://edition.cnn.com/politics
     ...
 
-    HTTP/1.1 200 OK
-    Content-Type: text/html; charset=utf-8
-    ...
-    Content-Length: 151654
+    HTTP/2 200
     ...
     {{< /text >}}
 
@@ -134,10 +114,10 @@ Both of these issues can be resolved by configuring Istio to perform TLS origina
 
 ## TLS origination for egress traffic
 
-1.  Redefine your `ServiceEntry` and `VirtualService` from the previous section to rewrite the HTTP request port
-    and add a `DestinationRule` to perform TLS origination.
+1.  Redefine your `ServiceEntry` from the previous section to redirect HTTP requests to port 443
+    and add a `DestinationRule` to perform TLS origination:
 
-    {{< text bash >}}
+    {{< text syntax=bash snip_id=apply_origination >}}
     $ kubectl apply -f - <<EOF
     apiVersion: networking.istio.io/v1alpha3
     kind: ServiceEntry
@@ -150,26 +130,11 @@ Both of these issues can be resolved by configuring Istio to perform TLS origina
       - number: 80
         name: http-port
         protocol: HTTP
+        targetPort: 443
       - number: 443
-        name: http-port-for-tls-origination
-        protocol: HTTP
+        name: https-port
+        protocol: HTTPS
       resolution: DNS
-    ---
-    apiVersion: networking.istio.io/v1alpha3
-    kind: VirtualService
-    metadata:
-      name: edition-cnn-com
-    spec:
-      hosts:
-      - edition.cnn.com
-      http:
-      - match:
-        - port: 80
-        route:
-        - destination:
-            host: edition.cnn.com
-            port:
-              number: 443
     ---
     apiVersion: networking.istio.io/v1alpha3
     kind: DestinationRule
@@ -178,29 +143,22 @@ Both of these issues can be resolved by configuring Istio to perform TLS origina
     spec:
       host: edition.cnn.com
       trafficPolicy:
-        loadBalancer:
-          simple: ROUND_ROBIN
         portLevelSettings:
         - port:
-            number: 443
+            number: 80
           tls:
             mode: SIMPLE # initiates HTTPS when accessing edition.cnn.com
     EOF
     {{< /text >}}
 
-    As you can see, the `VirtualService` redirects HTTP requests on port 80 to port 443 where the corresponding
-    `DestinationRule` then performs the TLS origination.
-    Notice that unlike the `ServiceEntry` in the previous section, this time the protocol on port 443 is HTTP, instead of HTTPS.
-    This is because clients will only send HTTP requests and Istio will upgrade the connection to HTTPS.
+    The above `DestinationRule` will perform TLS origination for HTTP requests on port 80 and the `ServiceEntry`
+    will then redirect the requests on port 80 to target port 443.
 
 1. Send an HTTP request to `http://edition.cnn.com/politics`, as in the previous section:
 
-    {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - http://edition.cnn.com/politics
+    {{< text syntax=bash snip_id=curl_origination_http >}}
+    $ kubectl exec "${SOURCE_POD}" -c sleep -- curl -sSL -o /dev/null -D - http://edition.cnn.com/politics
     HTTP/1.1 200 OK
-    Content-Type: text/html; charset=utf-8
-    ...
-    Content-Length: 151654
     ...
     {{< /text >}}
 
@@ -213,6 +171,14 @@ Both of these issues can be resolved by configuring Istio to perform TLS origina
     Note that you used the same command as in the previous section. For applications that access external services
     programmatically, the code does not need to be changed. You get the benefits of TLS origination by configuring Istio,
     without changing a line of code.
+
+1.  Note that the applications that used HTTPS to access the external service continue to work as before:
+
+    {{< text syntax=bash snip_id=curl_origination_https >}}
+    $ kubectl exec "${SOURCE_POD}" -c sleep -- curl -sSL -o /dev/null -D - https://edition.cnn.com/politics
+    HTTP/2 200
+    ...
+    {{< /text >}}
 
 ## Additional security considerations
 
@@ -234,7 +200,6 @@ topics and articles but does not prevent an attackers from learning that `editio
 
     {{< text bash >}}
     $ kubectl delete serviceentry edition-cnn-com
-    $ kubectl delete virtualservice edition-cnn-com
     $ kubectl delete destinationrule edition-cnn-com
     {{< /text >}}
 

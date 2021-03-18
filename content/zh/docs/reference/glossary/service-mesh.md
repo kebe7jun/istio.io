@@ -1,4 +1,8 @@
 ---
-title: 服务网格
+title: Service Mesh
 ---
-服务网格是一套共享的名称和标识，它们让通用策略实施和遥测收集成为可能。[服务名](#%E6%9C%8D%E5%8A%A1%E5%90%8D)和[工作负载实例主体](#%E5%B7%A5%E4%BD%9C%E8%B4%9F%E8%BD%BD%E5%AE%9E%E4%BE%8B%E4%B8%BB%E4%BD%93)在服务网格里是唯一的。
+*服务网格* （简称 *网格* ）是一个可管理、可观测以及支持[工作负载实例](/zh/docs/reference/glossary/#workload-instance)之间进行安全通信的基础设施层。
+
+在一个网格中，服务名称与命名空间组合具有唯一性。例如，在一个[多集群](/zh/docs/reference/glossary/#multicluster)的网格中，`cluster-1` 集群的 `foo` 命名空间中的 `bar` 服务和 `cluster-2` 集群的 `foo` 命名空间中的 `bar` 服务被认为是同一个服务。
+
+由于服务网格会共享这种[标识](/zh/docs/reference/glossary/#identity)，因此同一服务网格内的[工作负载实例](/zh/docs/reference/glossary/#workload-instance)可以相互认证通信。

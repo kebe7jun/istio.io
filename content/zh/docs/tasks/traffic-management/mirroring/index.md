@@ -1,6 +1,6 @@
 ---
 title: 镜像
-description: 此任务演示了 Istio 的流量镜像功能。
+description: 此任务演示了 Istio 的流量镜像/影子功能。
 weight: 60
 keywords: [traffic-management,mirroring]
 ---
@@ -9,24 +9,28 @@ keywords: [traffic-management,mirroring]
 
 流量镜像，也称为影子流量，是一个以尽可能低的风险为生产带来变化的强大的功能。镜像会将实时流量的副本发送到镜像服务。镜像流量发生在主服务的关键请求路径之外。
 
-在此任务中，首先把所有流量路由到 `v1` 测试服务。然后使用规则将一部分流量镜像到 `v2`。
+在此任务中，首先把流量全部路由到 `v1` 版本的测试服务。然后，执行规则将一部分流量镜像到 `v2` 版本。
 
-## 开始之前
+## 开始之前{#before-you-begin}
 
 * 按照[安装指南](/zh/docs/setup/)中的说明设置 Istio。
 
-* 首先部署启用了访问日志的两个版本的 [httpbin]({{< github_tree >}}/samples/httpbin) 服务：
+*   首先部署两个版本的 [httpbin]({{< github_tree >}}/samples/httpbin) 服务，[httpbin]({{< github_tree >}}/samples/httpbin) 服务已开启访问日志：
 
     **httpbin-v1:**
 
     {{< text bash >}}
     $ cat <<EOF | istioctl kube-inject -f - | kubectl create -f -
-    apiVersion: extensions/v1beta1
+    apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: httpbin-v1
     spec:
       replicas: 1
+      selector:
+        matchLabels:
+          app: httpbin
+          version: v1
       template:
         metadata:
           labels:
@@ -47,12 +51,16 @@ keywords: [traffic-management,mirroring]
 
     {{< text bash >}}
     $ cat <<EOF | istioctl kube-inject -f - | kubectl create -f -
-    apiVersion: extensions/v1beta1
+    apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: httpbin-v2
     spec:
       replicas: 1
+      selector:
+        matchLabels:
+          app: httpbin
+          version: v2
       template:
         metadata:
           labels:
@@ -89,18 +97,21 @@ keywords: [traffic-management,mirroring]
     EOF
     {{< /text >}}
 
-* 启动 `sleep` 服务，这样就可以使用 `curl` 来提供负载了：
+*   启动 `sleep` 服务，这样就可以使用 `curl` 来提供负载了：
 
     **sleep service:**
 
     {{< text bash >}}
     $ cat <<EOF | istioctl kube-inject -f - | kubectl create -f -
-    apiVersion: extensions/v1beta1
+    apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: sleep
     spec:
       replicas: 1
+      selector:
+        matchLabels:
+          app: sleep
       template:
         metadata:
           labels:
@@ -114,14 +125,14 @@ keywords: [traffic-management,mirroring]
     EOF
     {{< /text >}}
 
-## 创建默认路由策略
+## 创建一个默认路由策略{#creating-a-default-routing-policy}
 
 默认情况下，Kubernetes 在 `httpbin` 服务的两个版本之间进行负载均衡。在此步骤中会更改该行为，把所有流量都路由到 `v1`。
 
-1. 创建一个默认路由规则，将所有流量路由到服务的 `v1` ：
+1. 创建一个默认路由规则，将所有流量路由到服务的 `v1`：
 
     {{< warning >}}
-    如果为 Istio 启用了双向 TLS 认证，在应用前必须将 TLS 流量策略 `mode: ISTIO_MUTUAL` 添加到 `DestinationRule`。否则，请求将发生 503 错误，如[设置目标规则后出现 503 错误](/zh/docs/ops/traffic-management/troubleshooting/#设置目标规则后出现-503-错误)所述。
+    如果安装/配置 Istio 的时候开启了 TLS 认证，在应用 `DestinationRule` 之前必须将 TLS 流量策略 `mode: ISTIO_MUTUAL` 添加到 `DestinationRule`。否则，请求将发生 503 错误，如[设置目标规则后出现 503 错误](/zh/docs/ops/common-problems/network-issues/#service-unavailable-errors-after-setting-destination-rule)所述。
     {{< /warning >}}
 
     {{< text bash >}}
@@ -156,9 +167,9 @@ keywords: [traffic-management,mirroring]
     EOF
     {{< /text >}}
 
-    现在所有流量已经都转到 `httpbin:v1` 服务。
+    现在所有流量都转到`httpbin:v1`服务。
 
-1. 向服务发送一些流量：
+1. 向服务发送一下流量：
 
     {{< text bash json >}}
     $ export SLEEP_POD=$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})
@@ -177,7 +188,7 @@ keywords: [traffic-management,mirroring]
     }
     {{< /text >}}
 
-1. 查看 `httpbin` pods 的 `v1` 和 `v2` 日志。您可以看到 `v1` 的访问日志和 `v2` 为 `<none>` 的日志：
+1. 分别查看 `httpbin` 服务 `v1` 和 `v2` 两个 pods 的日志，您可以看到访问日志进入 `v1`，而 `v2` 中没有日志，显示为 `<none>`：
 
     {{< text bash >}}
     $ export V1_POD=$(kubectl get pod -l app=httpbin,version=v1 -o jsonpath={.items..metadata.name})
@@ -191,9 +202,9 @@ keywords: [traffic-management,mirroring]
     <none>
     {{< /text >}}
 
-## 镜像流量到 v2
+## 镜像流量到 v2{#mirroring-traffic-to-v2}
 
-1. 改变路由规则将流量镜像到 v2:
+1. 改变流量规则将流量镜像到 v2：
 
     {{< text bash >}}
     $ kubectl apply -f - <<EOF
@@ -213,20 +224,22 @@ keywords: [traffic-management,mirroring]
         mirror:
           host: httpbin
           subset: v2
+        mirror_percent: 100
     EOF
     {{< /text >}}
 
-    此路由规则将 100％ 的流量发送到 `v1` 。最后一节指定镜像到 `httpbin:v2` 服务。当流量被镜像时，请求将通过其主机/授权报头发送到镜像服务附上 `-shadow`。例如，将 `cluster-1` 变为 `cluster-1-shadow`。
+    这个路由规则发送 100% 流量到 `v1`。最后一段表示你将镜像流量到 `httpbin:v2` 服务。当流量被镜像时，请求将发送到镜像服务中，并在 `headers` 中的 `Host/Authority` 属性值上追加 `-shadow`。例如 `cluster-1` 变为 `cluster-1-shadow`。
 
-    此外，重点注意这些被镜像的请求是“即发即弃”的，也就是说这些请求引发的响应是会被丢弃的。
+    此外，重点注意这些被镜像的流量是『 即发即弃』 的，就是说镜像请求的响应会被丢弃。
 
+    您可以使用 `mirror_percent` 属性来设置镜像流量的百分比，而不是镜像全部请求。为了兼容老版本，如果这个属性不存在，将镜像所有流量。
 1. 发送流量：
 
     {{< text bash >}}
     $ kubectl exec -it $SLEEP_POD -c sleep -- sh -c 'curl  http://httpbin:8000/headers' | python -m json.tool
     {{< /text >}}
 
-    这样就可以看到 `v1` 和 `v2` 中都有了访问日志。`v2` 中的访问日志就是由镜像流量产生的，这些请求的实际目标是 `v1`：
+    现在就可以看到 `v1` 和 `v2` 中都有了访问日志。v2 中的访问日志就是由镜像流量产生的，这些请求的实际目标是 v1。
 
     {{< text bash >}}
     $ kubectl logs -f $V1_POD -c httpbin
@@ -243,8 +256,8 @@ keywords: [traffic-management,mirroring]
 
     {{< text bash >}}
     $ export SLEEP_POD=$(kubectl get pod -l app=sleep -o jsonpath={.items..metadata.name})
-    $ export V1_POD_IP=$(kubectl get pod -l app=httpbin -l version=v1 -o jsonpath={.items..status.podIP})
-    $ export V2_POD_IP=$(kubectl get pod -l app=httpbin -l version=v2 -o jsonpath={.items..status.podIP})
+    $ export V1_POD_IP=$(kubectl get pod -l app=httpbin,version=v1 -o jsonpath={.items..status.podIP})
+    $ export V2_POD_IP=$(kubectl get pod -l app=httpbin,version=v2 -o jsonpath={.items..status.podIP})
     $ kubectl exec -it $SLEEP_POD -c istio-proxy -- sudo tcpdump -A -s 0 host $V1_POD_IP or host $V2_POD_IP
     tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
     listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
@@ -349,9 +362,9 @@ keywords: [traffic-management,mirroring]
     ..t...|.
     {{< /text >}}
 
-    您可以查看流量​​的请求和响应内容。
+    您可以看到流量​​ 的请求和响应内容。
 
-## 清理
+## 清理{#cleaning-up}
 
 1. 删除规则：
 

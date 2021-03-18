@@ -1,4 +1,4 @@
 ---
-title: 服务生产者
+title: Service Producer
 ---
-创建[服务](#%E6%9C%8D%E5%8A%A1)的代理。
+创建[服务](/zh/docs/reference/glossary/#service)的 pilot-agent。

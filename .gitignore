@@ -3,6 +3,7 @@
 .pydevproject
 *.iml
 .idea/
+.vscode
 tmp/
 *.bak
 .DS_Store
@@ -12,3 +13,25 @@ public
 resources
 node_modules
 generated
+
+# install generated files
+install/**
+
+# contains samples to demo Istio
+samples/**
+
+# copied from istio repository
+tests/integration/**
+manifests/**
+
+# certs for test framework
+tools/certs/**
+
+# contains the built artifacts
+out/**
+
+# contains cloned istio repository
+go/**
+
+# archived site version
+archived_version

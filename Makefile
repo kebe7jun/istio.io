@@ -19,6 +19,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+SHELL := /bin/bash
+
 # allow optional per-repo overrides
 -include Makefile.overrides.mk
 
@@ -29,61 +31,41 @@
 export BUILD_WITH_CONTAINER ?= 0
 
 ifeq ($(BUILD_WITH_CONTAINER),1)
-IMG = gcr.io/istio-testing/build-tools:2019-08-29T13-57-48
-UID = $(shell id -u)
-PWD = $(shell pwd)
-GOBIN_SOURCE ?= $(GOPATH)/bin
-GOBIN ?= /work/out/bin
 
-LOCAL_ARCH := $(shell uname -m)
-ifeq ($(LOCAL_ARCH),x86_64)
-GOARCH_LOCAL := amd64
-else ifeq ($(shell echo $(LOCAL_ARCH) | head -c 5),armv8)
-GOARCH_LOCAL := arm64
-else ifeq ($(shell echo $(LOCAL_ARCH) | head -c 4),armv)
-GOARCH_LOCAL := arm
-else
-GOARCH_LOCAL := $(LOCAL_ARCH)
-endif
+# An export free of arugments in a Makefile places all variables in the Makefile into the
+# environment. This is needed to allow overrides from Makefile.overrides.mk.
+export
 
-GOARCH ?= $(GOARCH_LOCAL)
+$(shell $(shell pwd)/common/scripts/setup_env.sh)
 
-LOCAL_OS := $(shell uname)
-ifeq ($(LOCAL_OS),Linux)
-   GOOS_LOCAL = linux
-else ifeq ($(LOCAL_OS),Darwin)
-   GOOS_LOCAL = darwin
-else
-   $(error "This system's OS $(LOCAL_OS) isn't recognized/supported")
-endif
+RUN = ./common/scripts/run.sh
 
-GOOS ?= $(GOOS_LOCAL)
-
-RUN = docker run -t -i --sig-proxy=true -u $(UID) --rm \
-	-e GOOS="$(GOOS)" \
-	-e GOARCH="$(GOARCH)" \
-	-e GOBIN="$(GOBIN)" \
-	-e BUILD_WITH_CONTAINER="$(BUILD_WITH_CONTAINER)" \
-	-v /etc/passwd:/etc/passwd:ro \
-	-v $(readlink /etc/localtime):/etc/localtime:ro \
-	-v /var/run/docker.sock:/var/run/docker.sock \
-	$(CONTAINER_OPTIONS) \
-	--mount type=bind,source="$(PWD)",destination="/work" \
-	--mount type=volume,source=istio-go-mod,destination="/go/pkg/mod" \
-	--mount type=volume,source=istio-go-cache,destination="/gocache" \
-	--mount type=bind,source="$(GOBIN_SOURCE)",destination="/go/out/bin" \
-	-w /work $(IMG)
-else
-export GOBIN ?= ./out/bin
-RUN =
-endif
-
-MAKE = $(RUN) make --no-print-directory -e -f Makefile.core.mk
+MAKE_DOCKER = $(RUN) make --no-print-directory -e -f Makefile.core.mk
 
 %:
-	@$(MAKE) $@
+	@$(MAKE_DOCKER) $@
 
 default:
-	@$(MAKE)
+	@$(MAKE_DOCKER)
+
+shell:
+	@$(RUN) /bin/bash
 
 .PHONY: default
+
+else
+
+# If we are not in build container, we need a workaround to get environment properly set
+# Write to file, then include
+$(shell mkdir -p out)
+$(shell $(shell pwd)/common/scripts/setup_env.sh envfile > out/.env)
+include out/.env
+# An export free of arugments in a Makefile places all variables in the Makefile into the
+# environment. This behavior may be surprising to many that use shell often, which simply
+# displays the existing environment
+export
+
+export GOBIN ?= $(GOPATH)/bin
+include Makefile.core.mk
+
+endif

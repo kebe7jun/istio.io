@@ -1,9 +1,7 @@
 ---
-title: 适配器
+title: Adapters
 ---
 
-适配器（adapter）是 Istio 的[策略与遥测](/zh/docs/concepts/policies-and-telemetry/)组件： Mixer 里的插件。适配器使 Mixer 可以通过接口使用开放式基础设施后端服务，去为 Istio 提供核心功能，比如日志、监控、配额、ACL 检查等等。
+适配器（adapter）是 Istio [策略和遥测](/zh/docs/reference/config/policy-and-telemetry/)组件 [Mixer](/zh/docs/reference/glossary/#mixer) 的插件, 可使其与一组开放式基础架构后端交互，这些后端可提供核心功能，例如日志记录、监控、配额、ACL 检查等等。运行时所使用的精确的适配器集合是通过配置确定的，并可以针对新的或定制的基础架构后端轻松扩展。
 
-运行时确切生效的适配器是通过配置指定的，而且适配器很容易进行扩展来适配一个新的或者自定义的基础设施后端服务。
-
-[了解更多关于适配器](/zh/docs/concepts/policies-and-telemetry/#适配器)
+[了解更多关于适配器的信息](/zh/docs/reference/config/policy-and-telemetry/adapters)。

@@ -5,6 +5,7 @@ description: Comparison of alternative solutions to control egress traffic inclu
 publishdate: 2019-07-22
 attribution: Vadim Eisenberg (IBM)
 keywords: [traffic-management,egress,security,gateway,tls]
+target_release: 1.2
 ---
 
 Welcome to part 3 in our series about secure control of egress traffic in Istio.
@@ -143,7 +144,7 @@ Istio is the only solution I'm aware of that lets you:
 In my opinion, secure control of egress traffic is a great choice if you are looking for your first Istio use case.
 In this case, Istio already provides you some benefits even before you start using all other Istio features:
 [traffic management](/docs/tasks/traffic-management/), [security](/docs/tasks/security/),
-[policies](/docs/tasks/policy-enforcement/) and [observability](/docs/tasks/observability/), applied to traffic between
+[policies](https://istio.io/v1.6/docs/tasks/policy-enforcement/) and [observability](/docs/tasks/observability/), applied to traffic between
 microservices inside the cluster.
 
 So, if you haven't had the chance to work with Istio yet, [install Istio](/docs/setup/install/) on your cluster

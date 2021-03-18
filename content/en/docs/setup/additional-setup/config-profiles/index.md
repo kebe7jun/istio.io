@@ -5,91 +5,57 @@ weight: 35
 aliases:
     - /docs/setup/kubernetes/additional-setup/config-profiles/
 keywords: [profiles,install,helm]
+owner: istio/wg-environments-maintainers
+test: n/a
 ---
 
 This page describes the built-in configuration profiles that can be used when
-[installing Istio using helm](/docs/setup/install/helm/).
+[installing Istio](/docs/setup/install/istioctl/).
 The profiles provide customization of the Istio control plane and of the sidecars for the Istio data plane.
-You can start with one of Istio’s built-in configuration profiles and then further customize the configuration for
-your specific needs. The following built-in configuration profiles are currently available:
 
-1. **default**: enables components according to the default [Installation Options](/docs/reference/config/installation-options/)
-    (recommend for production deployments).
+You can start with one of Istio’s built-in configuration profiles and then further
+[customize the configuration](/docs/setup/install/istioctl/#customizing-the-configuration)
+for your specific needs. The following built-in configuration profiles are currently available:
+
+1. **default**: enables components according to the default settings of the
+    [`IstioOperator` API](/docs/reference/config/istio.operator.v1alpha1/).
+    This profile is recommended for production deployments and for
+    {{< gloss "primary cluster" >}}primary clusters{{< /gloss >}} in a
+    [multicluster mesh](/docs/ops/deployment/deployment-models/#multiple-clusters).
+    You can display the default settings by running the `istioctl profile dump` command.
 
 1. **demo**: configuration designed to showcase Istio functionality with modest resource requirements.
     It is suitable to run the [Bookinfo](/docs/examples/bookinfo/) application and associated tasks.
-    This is the same configuration that is installed with the [Quick Start](/docs/setup/install/kubernetes/) instructions, only using helm has the advantage
-    that you can more easily enable additional features if you later wish to explore more advanced tasks.
-    This profile comes in two variants, either with or without authentication enabled.
+    This is the configuration that is installed with the [quick start](/docs/setup/getting-started/) instructions.
 
     {{< warning >}}
     This profile enables high levels of tracing and access logging so it is not suitable for performance tests.
     {{< /warning >}}
 
-1. **minimal**: the minimal set of components necessary to use Istio's [traffic management](/docs/tasks/traffic-management/) features.
+1. **minimal**: same as the default profile, but only the control plane components are installed.
+    This allows you to configure the control plane and data plane components (e.g., gateways) using [separate profiles](/docs/setup/upgrade/gateways/#installation-with-istioctl).
 
-1. **sds-auth**: similar to the **default** profile, but also enables Istio's [SDS (secret discovery service)](/docs/tasks/security/auth-sds).
-    This profile comes with additional authentication features enabled by default.
+1. **remote**: used for configuring {{< gloss "remote cluster" >}}remote clusters{{< /gloss >}} of a
+    [multicluster mesh](/docs/ops/deployment/deployment-models/#multiple-clusters).
 
-The components marked as **X** are installed within each profile:
+1. **empty**: deploys nothing. This can be useful as a base profile for custom configuration.
 
-|     | default | demo | minimal | sds |
-| --- | --- | --- | --- | --- |
-| Profile filename | `values.yaml` | `values-istio-demo.yaml` | `values-istio-minimal.yaml` | `values-istio-sds-auth.yaml` |
-| Core components | | | | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-citadel` | X | X | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-egressgateway` | | X | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-galley` | X | X | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-ingressgateway` | X | X | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-nodeagent` | | | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-pilot` | X | X | X | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-policy` | X | X | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-sidecar-injector` | X | X | | X |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-telemetry` | X | X | | X |
-| Addons | | | | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`grafana` | | X | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-tracing` | | X | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`kiali` | | X | | |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`prometheus` | X | X | | X |
-
-Some profiles have an authentication variant, with `-auth` appended to the name, which adds the following
-security features to the profile:
+1. **preview**: the preview profile contains features that are experimental. This is intended to explore new features
+                coming to Istio. Stability, security, and performance are not guaranteed - use at your own risk.
 
 {{< tip >}}
-Control plane security with SDS is planned for an upcoming release.
+Some additional vendor-specific configuration profiles are also available.
+For more information, refer to the [setup instructions](/docs/setup/platform-setup) for your platform.
 {{< /tip >}}
 
-| Security feature | demo-auth | sds-auth |
-| --- | --- | --- |
-| Control Plane Security | X | |
-| Strict Mutual TLS | X | X |
-| SDS | | X |
+The components marked as &#x2714; are installed within each profile:
 
-To further customize Istio and install addons, you can add one or more `--set <key>=<value>` options in the `helm template` or `helm install` command that you use when installing Istio. The [Installation Options](/docs/reference/config/installation-options/) lists the complete set of supported installation key and value pairs.
+|     | default | demo | minimal | remote | empty | preview |
+| --- | --- | --- | --- | --- | --- | --- |
+| Core components | | | | | | | |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-egressgateway` | | &#x2714; | | | | | | |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istio-ingressgateway` | &#x2714; | &#x2714; | | | | &#x2714; |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`istiod` | &#x2714; | &#x2714; | &#x2714; | | | &#x2714; |
 
-## Multicluster profiles
-
-Istio provides two additional built-in configuration profiles that are used exclusively for configuring a
-[multi-cluster deployment](/docs/concepts/deployment-models/#multiple-clusters):
-
-1. **remote**: used for configuring remote clusters of a
-    multicluster mesh with a shared [control plane](/docs/concepts/deployment-models/#control-plane-models).
-
-1. **multicluster-gateways**: used for configuring clusters of a
-    multicluster mesh with replicated [control planes](/docs/concepts/deployment-models/#control-plane-models).
-
-The **remote** profile is configured using the values file `values-istio-remote.yaml`. This profile installs only two
-Istio core components:
-
-1. `istio-citadel`
-
-1. `istio-sidecar-injector`
-
-The **multicluster-gateways** profile is configured using the values file `values-istio-multicluster-gateways.yaml`.
-This profile installs the same components as the Istio **default** configuration profile plus two additional components:
-
-1. The `istio-egressgateway` core component.
-
-1. The `coredns` addon.
-
-Refer to the [multicluster installation instructions](/docs/setup/install/multicluster/) for more details.
+To further customize Istio, a number of addon components can also be installed.
+Refer to [integrations](/docs/ops/integrations) for more details.

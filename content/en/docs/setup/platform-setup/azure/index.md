@@ -1,13 +1,19 @@
 ---
 title: Azure
 description: Instructions to setup an Azure cluster for Istio.
-weight: 9
+weight: 10
 skip_seealso: true
 aliases:
     - /docs/setup/kubernetes/prepare/platform-setup/azure/
     - /docs/setup/kubernetes/platform-setup/azure/
 keywords: [platform-setup,azure]
+owner: istio/wg-environments-maintainers
+test: no
 ---
+
+This page was last updated September 12, 2019.
+
+{{< boilerplate untested-document >}}
 
 Follow these instructions to prepare an Azure cluster for Istio.
 

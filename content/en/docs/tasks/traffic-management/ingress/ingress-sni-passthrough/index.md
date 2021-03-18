@@ -5,9 +5,11 @@ weight: 30
 keywords: [traffic-management,ingress,https]
 aliases:
   - /docs/examples/advanced-gateways/ingress-sni-passthrough/
+owner: istio/wg-networking-maintainers
+test: yes
 ---
 
-The [Securing Gateways with HTTPS](/docs/tasks/traffic-management/ingress/secure-ingress-mount/) task describes how to configure HTTPS
+The [Securing Gateways with HTTPS](/docs/tasks/traffic-management/ingress/secure-ingress/) task describes how to configure HTTPS
 ingress access to an HTTP service. This example describes how to configure HTTPS ingress access to an HTTPS service,
 i.e., configure an ingress gateway to perform SNI passthrough, instead of TLS termination on incoming requests.
 
@@ -17,39 +19,20 @@ Then you configure a gateway to provide ingress access to the service via host `
 
 ## Generate client and server certificates and keys
 
-Generate the certificates and keys in the same way as in the [Securing Gateways with HTTPS](/docs/tasks/traffic-management/ingress/secure-ingress-mount/#generate-client-and-server-certificates-and-keys) task.
+For this task you can use your favorite tool to generate certificates and keys. The commands below use
+[openssl](https://man.openbsd.org/openssl.1)
 
-1.  Clone the <https://github.com/nicholasjackson/mtls-go-example> repository:
+1.  Create a root certificate and private key to sign the certificate for your services:
 
     {{< text bash >}}
-    $ git clone https://github.com/nicholasjackson/mtls-go-example
+    $ openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -subj '/O=example Inc./CN=example.com' -keyout example.com.key -out example.com.crt
     {{< /text >}}
 
-1.  Change directory to the cloned repository:
+1.  Create a certificate and a private key for `nginx.example.com`:
 
     {{< text bash >}}
-    $ pushd mtls-go-example
-    {{< /text >}}
-
-1.  Generate the certificates for `nginx.example.com`.
-    Use any password with the following command:
-
-    {{< text bash >}}
-    $ ./generate.sh nginx.example.com <password>
-    {{< /text >}}
-
-    When prompted, select `y` for all the questions.
-
-1.  Move the certificates into the `nginx.example.com` directory:
-
-    {{< text bash >}}
-    $ mkdir ../nginx.example.com && mv 1_root 2_intermediate 3_application 4_client ../nginx.example.com
-    {{< /text >}}
-
-1.  Return to the root directory:
-
-    {{< text bash >}}
-    $ popd
+    $ openssl req -out nginx.example.com.csr -newkey rsa:2048 -nodes -keyout nginx.example.com.key -subj "/CN=nginx.example.com/O=some organization"
+    $ openssl x509 -req -days 365 -CA example.com.crt -CAkey example.com.key -set_serial 0 -in nginx.example.com.csr -out nginx.example.com.crt
     {{< /text >}}
 
 ## Deploy an NGINX server
@@ -58,13 +41,13 @@ Generate the certificates and keys in the same way as in the [Securing Gateways 
    certificate.
 
     {{< text bash >}}
-    $ kubectl create secret tls nginx-server-certs --key nginx.example.com/3_application/private/nginx.example.com.key.pem --cert nginx.example.com/3_application/certs/nginx.example.com.cert.pem
+    $ kubectl create secret tls nginx-server-certs --key nginx.example.com.key --cert nginx.example.com.crt
     {{< /text >}}
 
 1.  Create a configuration file for the NGINX server:
 
     {{< text bash >}}
-    $ cat <<EOF > ./nginx.conf
+    $ cat <<\EOF > ./nginx.conf
     events {
     }
 
@@ -151,31 +134,27 @@ to hold the configuration of the NGINX server:
 
 1.  To test that the NGINX server was deployed successfully, send a request to the server from its sidecar proxy
     without checking the server's certificate (use the `-k` option of `curl`). Ensure that the server's certificate is
-    printed correctly, i.e., `common name` is equal to `nginx.example.com`.
+    printed correctly, i.e., `common name (CN)` is equal to `nginx.example.com`.
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod  -l run=my-nginx -o jsonpath={.items..metadata.name}) -c istio-proxy -- curl -v -k --resolve nginx.example.com:443:127.0.0.1 https://nginx.example.com
+    $ kubectl exec "$(kubectl get pod  -l run=my-nginx -o jsonpath={.items..metadata.name})" -c istio-proxy -- curl -sS -v -k --resolve nginx.example.com:443:127.0.0.1 https://nginx.example.com
     ...
-    SSL connection using TLS1.2 / ECDHE_RSA_AES_128_GCM_SHA256
-      server certificate verification SKIPPED
-      server certificate status verification SKIPPED
-      common name: nginx.example.com (matched)
-      server certificate expiration date OK
-      server certificate activation date OK
-      certificate public key: RSA
-      certificate version: #3
-      subject: C=US,ST=Denial,L=Springfield,O=Dis,CN=nginx.example.com
-      start date: Wed, 15 Aug 2018 07:29:07 GMT
-      expire date: Sun, 25 Aug 2019 07:29:07 GMT
-      issuer: C=US,ST=Denial,O=Dis,CN=nginx.example.com
+    SSL connection using TLSv1.2 / ECDHE-RSA-AES256-GCM-SHA384
+    ALPN, server accepted to use http/1.1
+    Server certificate:
+      subject: CN=nginx.example.com; O=some organization
+      start date: May 27 14:18:47 2020 GMT
+      expire date: May 27 14:18:47 2021 GMT
+      issuer: O=example Inc.; CN=example.com
+      SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
 
     > GET / HTTP/1.1
-    > User-Agent: curl/7.35.0
+    > User-Agent: curl/7.58.0
     > Host: nginx.example.com
     ...
     < HTTP/1.1 200 OK
 
-    < Server: nginx/1.15.2
+    < Server: nginx/1.17.10
     ...
     <!DOCTYPE html>
     <html>
@@ -186,7 +165,7 @@ to hold the configuration of the NGINX server:
 
 ## Configure an ingress gateway
 
-1.  Define a `Gateway` with a `server` section for port 443. Note the `PASSTHROUGH` `tls` `mode` which instructs
+1.  Define a `Gateway` with a `server` section for port 443. Note the `PASSTHROUGH` TLS mode which instructs
     the gateway to pass the ingress traffic AS IS, without terminating TLS.
 
     {{< text bash >}}
@@ -226,7 +205,7 @@ to hold the configuration of the NGINX server:
       tls:
       - match:
         - port: 443
-          sni_hosts:
+          sniHosts:
           - nginx.example.com
         route:
         - destination:
@@ -244,13 +223,12 @@ to hold the configuration of the NGINX server:
     it is successfully verified (_SSL certificate verify ok_ is printed).
 
     {{< text bash >}}
-    $ curl -v --resolve nginx.example.com:$SECURE_INGRESS_PORT:$INGRESS_HOST --cacert nginx.example.com/2_intermediate/certs/ca-chain.cert.pem https://nginx.example.com:$SECURE_INGRESS_PORT
+    $ curl -v --resolve "nginx.example.com:$SECURE_INGRESS_PORT:$INGRESS_HOST" --cacert example.com.crt "https://nginx.example.com:$SECURE_INGRESS_PORT"
     Server certificate:
-      subject: C=US; ST=Denial; L=Springfield; O=Dis; CN=nginx.example.com
-      start date: Aug 15 07:29:07 2018 GMT
-      expire date: Aug 25 07:29:07 2019 GMT
-      common name: nginx.example.com (matched)
-      issuer: C=US; ST=Denial; O=Dis; CN=nginx.example.com
+      subject: CN=nginx.example.com; O=some organization
+      start date: Wed, 15 Aug 2018 07:29:07 GMT
+      expire date: Sun, 25 Aug 2019 07:29:07 GMT
+      issuer: O=example Inc.; CN=example.com
       SSL certificate verify ok.
 
       < HTTP/1.1 200 OK
@@ -274,14 +252,14 @@ to hold the configuration of the NGINX server:
     $ kubectl delete virtualservice nginx
     {{< /text >}}
 
-1.  Delete the directory containing the certificates and the repository used to generate them:
+1.  Delete the certificates and keys:
 
     {{< text bash >}}
-    $ rm -rf nginx.example.com mtls-go-example
+    $ rm example.com.crt example.com.key nginx.example.com.crt nginx.example.com.key nginx.example.com.csr
     {{< /text >}}
 
 1.  Delete the generated configuration files used in this example:
 
     {{< text bash >}}
-    $ rm -f ./nginx.conf
+    $ rm ./nginx.conf
     {{< /text >}}

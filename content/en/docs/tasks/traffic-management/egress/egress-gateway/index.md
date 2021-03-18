@@ -5,19 +5,21 @@ weight: 30
 keywords: [traffic-management,egress]
 aliases:
   - /docs/examples/advanced-gateways/egress-gateway/
+owner: istio/wg-networking-maintainers
+test: yes
 ---
 
 {{<warning>}}
 This example does not work in Minikube.
 {{</warning>}}
 
-The [Control Egress Traffic](/docs/tasks/traffic-management/egress/) task shows how to configure
+The [Accessing External Services](/docs/tasks/traffic-management/egress/egress-control) task shows how to configure
 Istio to allow access to external HTTP and HTTPS services from applications inside the mesh.
 There, the external services are called directly from the client sidecar.
 This example also shows how to configure Istio to call external services, although this time
 indirectly via a dedicated _egress gateway_ service.
 
-Istio uses [ingress and egress gateways](/docs/reference/config/networking/v1alpha3/gateway/)
+Istio uses [ingress and egress gateways](/docs/reference/config/networking/gateway/)
 to configure load balancers executing at the edge of a service mesh.
 An ingress gateway allows you to define entry points into the mesh that all incoming traffic flows through.
 Egress gateway is a symmetrical concept; it defines exit points from the mesh. Egress gateways allow
@@ -39,6 +41,14 @@ controlled way.
 
 *   [Enable Envoy’s access logging](/docs/tasks/observability/logs/access-log/#enable-envoy-s-access-logging)
 
+{{< warning >}}
+The instructions in this task create a destination rule for the egress gateway in the `default` namespace
+and assume that the client, `SOURCE_POD`, is also running in the `default` namespace.
+If not, the destination rule will not be found on the
+[destination rule lookup path](/docs/ops/best-practices/traffic-management/#cross-namespace-configuration)
+and the client requests will fail.
+{{< /warning >}}
+
 ## Deploy Istio egress gateway
 
 1.  Check if the Istio egress gateway is deployed:
@@ -47,33 +57,41 @@ controlled way.
     $ kubectl get pod -l istio=egressgateway -n istio-system
     {{< /text >}}
 
-    If no pods are returned, deploy the Istio egress gateway by performing the next step.
+    If no pods are returned, deploy the Istio egress gateway by performing the following step.
 
-1.  Use `helm template` (or `helm install` with the corresponding flags):
+1.  If you used an `IstioOperator` CR to install Istio, add the following fields to your configuration:
 
-    {{< text bash >}}
-    $ helm template install/kubernetes/helm/istio --name istio-egressgateway --namespace istio-system \
-        -x charts/gateways/templates/deployment.yaml -x charts/gateways/templates/service.yaml \
-        -x charts/gateways/templates/serviceaccount.yaml -x charts/gateways/templates/autoscale.yaml \
-        -x charts/gateways/templates/role.yaml -x charts/gateways/templates/rolebindings.yaml \
-        --set global.istioNamespace=istio-system --set gateways.istio-ingressgateway.enabled=false \
-        --set gateways.istio-egressgateway.enabled=true | kubectl apply -f -
+    {{< text yaml >}}
+    spec:
+      components:
+        egressGateways:
+        - name: istio-egressgateway
+          enabled: true
     {{< /text >}}
 
-{{< warning >}}
-The following instructions create a destination rule for the egress gateway in the `default` namespace
-and assume that the client, `SOURCE_POD`, is also running in the `default` namespace.
-If not, the destination rule will not be found on the
-[destination rule lookup path](/docs/ops/traffic-management/deploy-guidelines/#cross-namespace-configuration-sharing)
-and the client requests will fail.
+    Otherwise, add the equivalent settings to your original `istioctl install` command, for example:
 
-{{< /warning >}}
+    {{< text syntax=bash snip_id=none >}}
+    $ istioctl install <flags-you-used-to-install-Istio> \
+                       --set components.egressGateways[0].name=istio-egressgateway \
+                       --set components.egressGateways[0].enabled=true
+    {{< /text >}}
 
 ## Egress gateway for HTTP traffic
 
 First create a `ServiceEntry` to allow direct traffic to an external service.
 
-1.  Define a `ServiceEntry` for `edition.cnn.com`:
+1.  Define a `ServiceEntry` for `edition.cnn.com`.
+
+    {{< warning >}}
+    `DNS` resolution must be used in the service entry below. If the resolution is `NONE`, the gateway will
+    direct the traffic to itself in an infinite loop. This is because the gateway receives a request with the original
+    destination IP address which is equal to the service IP of the gateway (since the request is directed by sidecar
+    proxies to the gateway).
+
+    With `DNS` resolution, the gateway performs a DNS query to get an IP address of the external service and directs
+    the traffic to that IP address.
+    {{< /warning >}}
 
     {{< text bash >}}
     $ kubectl apply -f - <<EOF
@@ -98,16 +116,15 @@ First create a `ServiceEntry` to allow direct traffic to an external service.
 1.  Verify that your `ServiceEntry` was applied correctly by sending an HTTP request to [http://edition.cnn.com/politics](http://edition.cnn.com/politics).
 
     {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - http://edition.cnn.com/politics
+    $ kubectl exec "$SOURCE_POD" -c sleep -- curl -sSL -o /dev/null -D - http://edition.cnn.com/politics
+    ...
     HTTP/1.1 301 Moved Permanently
     ...
     location: https://edition.cnn.com/politics
     ...
 
-    HTTP/1.1 200 OK
+    HTTP/2 200
     Content-Type: text/html; charset=utf-8
-    ...
-    Content-Length: 151654
     ...
     {{< /text >}}
 
@@ -118,60 +135,12 @@ First create a `ServiceEntry` to allow direct traffic to an external service.
 1.  Create an egress `Gateway` for _edition.cnn.com_, port 80, and a destination rule for
     traffic directed to the egress gateway.
 
-    Choose the instructions corresponding to whether or not you have
-    [mutual TLS Authentication](/docs/tasks/security/mutual-tls/) enabled in Istio.
+    {{< tip >}}
+    To direct multiple hosts through an egress gateway, you can include a list of hosts, or use `*` to match all, in the `Gateway`.
+    The `subset` field in the `DestinationRule` should be reused for the additional hosts.
+    {{< /tip >}}
 
-    {{< tabset cookie-name="mtls" >}}
-
-    {{< tab name="mutual TLS enabled" cookie-value="enabled" >}}
-
-    {{< text_hack bash >}}
-    $ kubectl apply -f - <<EOF
-    apiVersion: networking.istio.io/v1alpha3
-    kind: Gateway
-    metadata:
-      name: istio-egressgateway
-    spec:
-      selector:
-        istio: egressgateway
-      servers:
-      - port:
-          number: 80
-          name: https
-          protocol: HTTPS
-        hosts:
-        - edition.cnn.com
-        tls:
-          mode: MUTUAL
-          serverCertificate: /etc/certs/cert-chain.pem
-          privateKey: /etc/certs/key.pem
-          caCertificates: /etc/certs/root-cert.pem
-    ---
-    apiVersion: networking.istio.io/v1alpha3
-    kind: DestinationRule
-    metadata:
-      name: egressgateway-for-cnn
-    spec:
-      host: istio-egressgateway.istio-system.svc.cluster.local
-      subsets:
-      - name: cnn
-        trafficPolicy:
-          loadBalancer:
-            simple: ROUND_ROBIN
-          portLevelSettings:
-          - port:
-              number: 80
-            tls:
-              mode: ISTIO_MUTUAL
-              sni: edition.cnn.com
-    EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< tab name="mutual TLS disabled" cookie-value="disabled" >}}
-
-    {{< text_hack bash >}}
+    {{< text bash >}}
     $ kubectl apply -f - <<EOF
     apiVersion: networking.istio.io/v1alpha3
     kind: Gateway
@@ -197,11 +166,7 @@ First create a `ServiceEntry` to allow direct traffic to an external service.
       subsets:
       - name: cnn
     EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< /tabset >}}
+    {{< /text >}}
 
 1.  Define a `VirtualService` to direct traffic from the sidecars to the egress gateway and from the egress gateway
     to the external service:
@@ -246,16 +211,15 @@ First create a `ServiceEntry` to allow direct traffic to an external service.
 1.  Resend the HTTP request to [http://edition.cnn.com/politics](https://edition.cnn.com/politics).
 
     {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - http://edition.cnn.com/politics
+    $ kubectl exec "$SOURCE_POD" -c sleep -- curl -sSL -o /dev/null -D - http://edition.cnn.com/politics
+    ...
     HTTP/1.1 301 Moved Permanently
     ...
     location: https://edition.cnn.com/politics
     ...
 
-    HTTP/1.1 200 OK
+    HTTP/2 200
     Content-Type: text/html; charset=utf-8
-    ...
-    Content-Length: 151654
     ...
     {{< /text >}}
 
@@ -315,106 +279,22 @@ You need to specify port 443 with protocol `TLS` in a corresponding `ServiceEntr
 1.  Verify that your `ServiceEntry` was applied correctly by sending an HTTPS request to [https://edition.cnn.com/politics](https://edition.cnn.com/politics).
 
     {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - https://edition.cnn.com/politics
-    HTTP/1.1 200 OK
-    Content-Type: text/html; charset=utf-8
+    $ kubectl exec "$SOURCE_POD" -c sleep -- curl -sSL -o /dev/null -D - https://edition.cnn.com/politics
     ...
-    Content-Length: 151654
+    HTTP/2 200
+    Content-Type: text/html; charset=utf-8
     ...
     {{< /text >}}
 
 1.  Create an egress `Gateway` for _edition.cnn.com_, a destination rule and a virtual service
     to direct the traffic through the egress gateway and from the egress gateway to the external service.
 
-    Choose the instructions corresponding to whether or not you have
-    [mutual TLS Authentication](/docs/tasks/security/mutual-tls/) enabled in Istio.
+    {{< tip >}}
+    To direct multiple hosts through an egress gateway, you can include a list of hosts, or use `*` to match all, in the `Gateway`.
+    The `subset` field in the `DestinationRule` should be reused for the additional hosts.
+    {{< /tip >}}
 
-    {{< tabset cookie-name="mtls" >}}
-
-    {{< tab name="mutual TLS enabled" cookie-value="enabled" >}}
-
-    {{< text_hack bash >}}
-    $ kubectl apply -f - <<EOF
-    apiVersion: networking.istio.io/v1alpha3
-    kind: Gateway
-    metadata:
-      name: istio-egressgateway
-    spec:
-      selector:
-        istio: egressgateway
-      servers:
-      - port:
-          number: 443
-          name: tls-cnn
-          protocol: TLS
-        hosts:
-        - edition.cnn.com
-        tls:
-          mode: MUTUAL
-          serverCertificate: /etc/certs/cert-chain.pem
-          privateKey: /etc/certs/key.pem
-          caCertificates: /etc/certs/root-cert.pem
-    ---
-    apiVersion: networking.istio.io/v1alpha3
-    kind: DestinationRule
-    metadata:
-      name: egressgateway-for-cnn
-    spec:
-      host: istio-egressgateway.istio-system.svc.cluster.local
-      subsets:
-      - name: cnn
-        trafficPolicy:
-          loadBalancer:
-            simple: ROUND_ROBIN
-          portLevelSettings:
-          - port:
-              number: 443
-            tls:
-              mode: ISTIO_MUTUAL
-              sni: edition.cnn.com
-    ---
-    apiVersion: networking.istio.io/v1alpha3
-    kind: VirtualService
-    metadata:
-      name: direct-cnn-through-egress-gateway
-    spec:
-      hosts:
-      - edition.cnn.com
-      gateways:
-      - mesh
-      - istio-egressgateway
-      tls:
-      - match:
-        - gateways:
-          - mesh
-          port: 443
-          sni_hosts:
-          - edition.cnn.com
-        route:
-        - destination:
-            host: istio-egressgateway.istio-system.svc.cluster.local
-            subset: cnn
-            port:
-              number: 443
-      tcp:
-      - match:
-        - gateways:
-          - istio-egressgateway
-          port: 443
-        route:
-        - destination:
-            host: edition.cnn.com
-            port:
-              number: 443
-          weight: 100
-    EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< tab name="mutual TLS disabled" cookie-value="disabled" >}}
-
-    {{< text_hack bash >}}
+    {{< text bash >}}
     $ kubectl apply -f - <<EOF
     apiVersion: networking.istio.io/v1alpha3
     kind: Gateway
@@ -457,7 +337,7 @@ You need to specify port 443 with protocol `TLS` in a corresponding `ServiceEntr
         - gateways:
           - mesh
           port: 443
-          sni_hosts:
+          sniHosts:
           - edition.cnn.com
         route:
         - destination:
@@ -469,7 +349,7 @@ You need to specify port 443 with protocol `TLS` in a corresponding `ServiceEntr
         - gateways:
           - istio-egressgateway
           port: 443
-          sni_hosts:
+          sniHosts:
           - edition.cnn.com
         route:
         - destination:
@@ -478,21 +358,16 @@ You need to specify port 443 with protocol `TLS` in a corresponding `ServiceEntr
               number: 443
           weight: 100
     EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< /tabset >}}
+    {{< /text >}}
 
 1.  Send an HTTPS request to [https://edition.cnn.com/politics](https://edition.cnn.com/politics).
     The output should be the same as before.
 
     {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- curl -sL -o /dev/null -D - https://edition.cnn.com/politics
-    HTTP/1.1 200 OK
-    Content-Type: text/html; charset=utf-8
+    $ kubectl exec "$SOURCE_POD" -c sleep -- curl -sSL -o /dev/null -D - https://edition.cnn.com/politics
     ...
-    Content-Length: 151654
+    HTTP/2 200
+    Content-Type: text/html; charset=utf-8
     ...
     {{< /text >}}
 
@@ -565,7 +440,7 @@ external service.
 1.  Check that the deployed pod has a single container with no Istio sidecar attached:
 
     {{< text bash >}}
-    $ kubectl get pod $(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name}) -n test-egress
+    $ kubectl get pod "$(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name})" -n test-egress
     NAME                     READY     STATUS    RESTARTS   AGE
     sleep-776b7bcdcd-z7mc4   1/1       Running   0          18m
     {{< /text >}}
@@ -574,7 +449,7 @@ external service.
     the `test-egress` namespace. The request will succeed since you did not define any restrictive policies yet.
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name}) -n test-egress -c sleep -- curl -s -o /dev/null -w "%{http_code}\n"  https://edition.cnn.com/politics
+    $ kubectl exec "$(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name})" -n test-egress -c sleep -- curl -s -o /dev/null -w "%{http_code}\n"  https://edition.cnn.com/politics
     200
     {{< /text >}}
 
@@ -619,6 +494,13 @@ external service.
     EOF
     {{< /text >}}
 
+    {{< warning >}}
+    [Network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+    are implemented by the network plugin in your Kubernetes cluster.
+    Depending on your test cluster, the traffic may not be blocked in the following
+    step.
+    {{< /warning >}}
+
 1.  Resend the previous HTTPS request to [https://edition.cnn.com/politics](https://edition.cnn.com/politics). Now it
     should fail since the traffic is blocked by the network policy. Note that the `sleep` pod cannot bypass
     `istio-egressgateway`. The only way it can access `edition.cnn.com` is by using an Istio sidecar proxy and by
@@ -626,7 +508,7 @@ external service.
     bypass its sidecar proxy, it will not be able to access external sites and will be blocked by the network policy.
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name}) -n test-egress -c sleep -- curl -v https://edition.cnn.com/politics
+    $ kubectl exec "$(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name})" -n test-egress -c sleep -- curl -v -sS https://edition.cnn.com/politics
     Hostname was NOT found in DNS cache
       Trying 151.101.65.67...
       Trying 2a04:4e42:200::323...
@@ -657,46 +539,13 @@ external service.
 1.  Check that the deployed pod has two containers, including the Istio sidecar proxy (`istio-proxy`):
 
     {{< text bash >}}
-    $ kubectl get pod $(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name}) -n test-egress -o jsonpath={.spec.containers[*].name}
+    $ kubectl get pod "$(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name})" -n test-egress -o jsonpath='{.spec.containers[*].name}'
     sleep istio-proxy
     {{< /text >}}
 
 1.  Create the same destination rule as for the `sleep` pod in the `default` namespace to direct the traffic through the egress gateway:
 
-    Choose the instructions corresponding to whether or not you have
-    [mutual TLS Authentication](/docs/tasks/security/mutual-tls/) enabled in Istio.
-
-    {{< tabset cookie-name="mtls" >}}
-
-    {{< tab name="mutual TLS enabled" cookie-value="enabled" >}}
-
-    {{< text_hack bash >}}
-    $ kubectl apply -n test-egress -f - <<EOF
-    apiVersion: networking.istio.io/v1alpha3
-    kind: DestinationRule
-    metadata:
-      name: egressgateway-for-cnn
-    spec:
-      host: istio-egressgateway.istio-system.svc.cluster.local
-      subsets:
-      - name: cnn
-        trafficPolicy:
-          loadBalancer:
-            simple: ROUND_ROBIN
-          portLevelSettings:
-          - port:
-              number: 443
-            tls:
-              mode: ISTIO_MUTUAL
-              sni: edition.cnn.com
-    EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< tab name="mutual TLS disabled" cookie-value="disabled" >}}
-
-    {{< text_hack bash >}}
+    {{< text bash >}}
     $ kubectl apply -n test-egress -f - <<EOF
     apiVersion: networking.istio.io/v1alpha3
     kind: DestinationRule
@@ -707,28 +556,28 @@ external service.
       subsets:
       - name: cnn
     EOF
-    {{< /text_hack >}}
-
-    {{< /tab >}}
-
-    {{< /tabset >}}
+    {{< /text >}}
 
 1.  Send an HTTPS request to [https://edition.cnn.com/politics](https://edition.cnn.com/politics). Now it should succeed
     since the traffic flows to `istio-egressgateway` in the `istio-system` namespace, which is allowed by the
     Network Policy you defined. `istio-egressgateway` forwards the traffic to `edition.cnn.com`.
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name}) -n test-egress -c sleep -- curl -s -o /dev/null -w "%{http_code}\n" https://edition.cnn.com/politics
+    $ kubectl exec "$(kubectl get pod -n test-egress -l app=sleep -o jsonpath={.items..metadata.name})" -n test-egress -c sleep -- curl -sS -o /dev/null -w "%{http_code}\n" https://edition.cnn.com/politics
     200
     {{< /text >}}
 
-1.  Check the statistics of the egress gateway's proxy and see a counter that corresponds to our
-    requests to _edition.cnn.com_. If Istio is deployed in the `istio-system` namespace, the command to print the
-    counter is:
+1.  Check the log of the egress gateway's proxy. If Istio is deployed in the `istio-system` namespace, the command to
+    print the log is:
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod -l istio=egressgateway -n istio-system -o jsonpath='{.items[0].metadata.name}') -c istio-proxy -n istio-system -- curl -s localhost:15000/stats | grep edition.cnn.com.upstream_cx_total
-    cluster.outbound|443||edition.cnn.com.upstream_cx_total: 2
+    $ kubectl logs -l istio=egressgateway -n istio-system
+    {{< /text >}}
+
+    You should see a line similar to the following:
+
+    {{< text plain >}}
+    [2020-03-06T18:12:33.101Z] "- - -" 0 - "-" "-" 906 1352475 35 - "-" "-" "-" "-" "151.101.193.67:443" outbound|443||edition.cnn.com 172.30.223.53:39460 172.30.223.53:443 172.30.223.58:38138 edition.cnn.com -
     {{< /text >}}
 
 ### Cleanup network policies
@@ -748,16 +597,11 @@ external service.
 
 ## Troubleshooting
 
-1.  Check if you have [mutual TLS Authentication](/docs/tasks/security/mutual-tls/) enabled in Istio, following the
-    steps in [Verify mutual TLS configuration](/docs/tasks/security/mutual-tls/#verify-mutual-tls-configuration).
-    If mutual TLS is enabled, make sure you create the configuration
-    items accordingly (note the remarks _If you have mutual TLS Authentication enabled in Istio, you must create..._).
-
-1.  If [mutual TLS Authentication](/docs/tasks/security/mutual-tls/) is enabled, verify the correct certificate of the
+1.  If [mutual TLS Authentication](/docs/tasks/security/authentication/authn-policy/) is enabled, verify the correct certificate of the
     egress gateway:
 
     {{< text bash >}}
-    $ kubectl exec -i -n istio-system $(kubectl get pod -l istio=egressgateway -n istio-system -o jsonpath='{.items[0].metadata.name}')  -- cat /etc/certs/cert-chain.pem | openssl x509 -text -noout  | grep 'Subject Alternative Name' -A 1
+    $ kubectl exec -i -n istio-system "$(kubectl get pod -l istio=egressgateway -n istio-system -o jsonpath='{.items[0].metadata.name}')"  -- cat /etc/certs/cert-chain.pem | openssl x509 -text -noout  | grep 'Subject Alternative Name' -A 1
             X509v3 Subject Alternative Name:
                 URI:spiffe://cluster.local/ns/istio-system/sa/istio-egressgateway-service-account
     {{< /text >}}
@@ -766,7 +610,7 @@ external service.
     _openssl_ has an explicit option for setting the SNI, namely `-servername`.
 
     {{< text bash >}}
-    $ kubectl exec -it $SOURCE_POD -c sleep -- openssl s_client -connect edition.cnn.com:443 -servername edition.cnn.com
+    $ kubectl exec "$SOURCE_POD" -c sleep -- openssl s_client -connect edition.cnn.com:443 -servername edition.cnn.com
     CONNECTED(00000003)
     ...
     Certificate chain
@@ -783,13 +627,13 @@ external service.
     If you get the certificate as in the output above, your traffic is routed correctly. Check the statistics of the egress gateway's proxy and see a counter that corresponds to your requests (sent by _openssl_ and _curl_) to _edition.cnn.com_.
 
     {{< text bash >}}
-    $ kubectl exec -it $(kubectl get pod -l istio=egressgateway -n istio-system -o jsonpath='{.items[0].metadata.name}') -c istio-proxy -n istio-system -- curl -s localhost:15000/stats | grep edition.cnn.com.upstream_cx_total
+    $ kubectl exec "$(kubectl get pod -l istio=egressgateway -n istio-system -o jsonpath='{.items[0].metadata.name}')" -c istio-proxy -n istio-system -- pilot-agent request GET stats | grep edition.cnn.com.upstream_cx_total
     cluster.outbound|443||edition.cnn.com.upstream_cx_total: 2
     {{< /text >}}
 
 ## Cleanup
 
-Shutdown the [sleep]({{<github_tree>}}/samples/sleep) service:
+Shutdown the [sleep]({{< github_tree >}}/samples/sleep) service:
 
 {{< text bash >}}
 $ kubectl delete -f @samples/sleep/sleep.yaml@

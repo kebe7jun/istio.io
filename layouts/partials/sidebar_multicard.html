@@ -18,7 +18,11 @@
                     </button>
 
                     <div class="body{{if .IsAncestor $current}} default{{end}}" aria-labelledby="{{ $id }}" role="region" id="{{ $id }}-body">
-                        {{ partial "sidebar_level.html" (dict "pages" $pages "parent" $page "current" $current "collapse" false "top" true "labelledby" $id ) }}
+                        {{ if ($page.IsAncestor $current) }}
+                            {{ partial "sidebar_level.html" (dict "pages" $pages "parent" $page "current" $current "collapse" false "top" true "labelledby" $id ) }}
+                        {{ else }}
+                            {{ partialCached "sidebar_level.html" (dict "pages" $pages "parent" $page "current" $current "collapse" false "top" true "labelledby" $id ) $page.CurrentSection }}
+                        {{ end }}
                     </div>
                 </div>
             {{ end }}
@@ -27,7 +31,15 @@
         {{ if not .Site.Data.args.archive }}
             {{ if strings.HasSuffix $section.File.Dir "blog/" }}
                 <div id="subscribe" >
-                    <a href="/feed.xml" target="_blank">
+                    <a href="/blog/feed.xml" target="_blank">
+                        {{ partial "large_icon.html" "rss" }}{{ i18n "subscribe" }}
+                    </a>
+                </div>
+            {{ end }}
+
+            {{ if strings.HasSuffix $section.File.Dir "news/" }}
+                <div id="subscribe" >
+                    <a href="/news/feed.xml" target="_blank">
                         {{ partial "large_icon.html" "rss" }}{{ i18n "subscribe" }}
                     </a>
                 </div>

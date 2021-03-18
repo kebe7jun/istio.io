@@ -1,157 +1,68 @@
 ---
 title: 流量管理
-description: 介绍 Istio 中关于流量路由与控制的各项功能。
+description: 描述 Istio 多样的流量路由和控制特性。
 weight: 20
-keywords: [traffic-management]
+keywords: [traffic-management,pilot, envoy-proxies, service-discovery, load-balancing]
+aliases:
+    - /zh/docs/concepts/traffic-management/pilot
+    - /zh/docs/concepts/traffic-management/rules-configuration
+    - /zh/docs/concepts/traffic-management/fault-injection
+    - /zh/docs/concepts/traffic-management/handling-failures
+    - /zh/docs/concepts/traffic-management/load-balancing
+    - /zh/docs/concepts/traffic-management/request-routing
+    - /zh/docs/concepts/traffic-management/pilot.html
 ---
 
-本页概述了 Istio 中流量管理的工作原理，包括流量管理原则的优点。本文假设你已经阅读了 [Istio 是什么？](/zh/docs/concepts/what-is-istio/)并熟悉 Istio 的顶层设计架构。有关单个流量管理功能的更多信息，您可以在本节其他指南中了解。
+Istio 的流量路由规则可以让您很容易的控制服务之间的流量和 API 调用。Istio 简化了服务级别属性的配置，比如熔断器、超时和重试，并且能轻松的设置重要的任务，如 A/B 测试、金丝雀发布、基于流量百分比切分的概率发布等。它还提供了开箱即用的故障恢复特性，有助于增强应用的健壮性，从而更好地应对被依赖的服务或网络发生故障的情况。
 
-使用 Istio 的流量管理模型，本质上是将流量与基础设施扩容解耦，让运维人员可以通过 Pilot 指定流量遵循什么规则，而不是指定哪些 pod/VM 应该接收流量——Pilot 和智能 Envoy 代理会帮我们搞定。因此，例如，您可以通过 Pilot 指定特定服务的 5％ 流量可以转到金丝雀版本，而不必考虑金丝雀部署的大小，或根据请求的内容将流量发送到特定版本。
+Istio 的流量管理模型源于和服务一起部署的 {{< gloss >}}Envoy{{</ gloss >}} 代理。网格内服务发送和接收的所有流量（{{< gloss >}}data plane{{</ gloss >}}流量）都经由 Envoy 代理，这让控制网格内的流量变得异常简单，而且不需要对服务做任何的更改。
 
-{{< image width="85%"
-    link="./TrafficManagementOverview.svg"
-    caption=" Istio 流量管理"
-    >}}
+本节中描述的功能特性，如果您对它们是如何工作的感兴趣的话，可以在[架构概述](/zh/docs/ops/deployment/architecture/)中找到关于 Istio 的流量管理实现的更多信息。本部分只介绍 Istio 的流量管理特性。
 
-将流量从基础设施扩展中解耦，这样就可以让 Istio 提供各种独立于应用程序代码之外的流量管理功能。
-除了 A/B 测试的动态[请求路由](#请求路由)，逐步推出和金丝雀发布之外，
-它还使用超时、重试和熔断器来处理[故障恢复](#故障处理)，
-最后还可以通过[故障注入](#故障注入)来测试服务之间故障恢复策略的兼容性。
-这些功能都是通过在服务网格中部署的 Envoy sidecar/代理来实现的。
+## Istio 流量管理介绍 {#introducing-Istio-traffic-management}
 
-## Pilot 和 Envoy
+为了在网格中导流，Istio 需要知道所有的 endpoint 在哪和属于哪个服务。为了定位到{{< gloss >}}service registry{{</ gloss >}}(服务注册中心)，Istio 会连接到一个服务发现系统。例如，如果您在 Kubernetes 集群上安装了 Istio，那么它将自动检测该集群中的服务和 endpoint。
 
-Istio 流量管理的核心组件是 [Pilot](#pilot-和-envoy)，它管理和配置部署在特定 Istio 服务网格中的所有 Envoy 代理实例。它允许您指定在 Envoy 代理之间使用什么样的路由流量规则，并配置故障恢复功能，如超时、重试和熔断器。它还维护了网格中所有服务的规范模型，并使用这个模型通过发现服务让 Envoy 了解网格中的其他实例。
+使用此服务注册中心，Envoy 代理可以将流量定向到相关服务。大多数基于微服务的应用程序，每个服务的工作负载都有多个实例来处理流量，称为负载均衡池。默认情况下，Envoy 代理基于轮询调度模型在服务的负载均衡池内分发流量，按顺序将请求发送给池中每个成员，一旦所有服务实例均接收过一次请求后，重新回到第一个池成员。
 
-每个 Envoy 实例都会维护[负载均衡信息](#服务发现和负载均衡)信息，这些信息来自 Pilot 以及对负载均衡池中其他实例的定期健康检查。从而允许其在目标实例之间智能分配流量，同时遵循其指定的路由规则。
+Istio 基本的服务发现和负载均衡能力为您提供了一个可用的服务网格，但它能做到的远比这多的多。在许多情况下，您可能希望对网格的流量情况进行更细粒度的控制。作为 A/B 测试的一部分，您可能想将特定百分比的流量定向到新版本的服务，或者为特定的服务实例子集应用不同的负载均衡策略。您可能还想对进出网格的流量应用特殊的规则，或者将网格的外部依赖项添加到服务注册中心。通过使用 Istio 的流量管理 API 将流量配置添加到 Istio，就可以完成所有这些甚至更多的工作。
 
-Pilot 负责管理通过 Istio 服务网格发布的 Envoy 实例的生命周期。
+和其他 Istio 配置一样，这些 API 也使用 Kubernetes 的自定义资源定义（{{< gloss >}}CRDs{{</ gloss >}}）来声明，您可以像示例中看到的那样使用 YAML 进行配置。
 
-{{< image width="60%"
-    link="./PilotAdapters.svg"
-    caption="Pilot 架构"
-    >}}
+本章节的其余部分将分别介绍每个流量管理 API 以及如何使用它们。这些资源包括：
 
-如上图所示，在网格中 Pilot 维护了一个服务的规则表示并独立于底层平台。Pilot中的特定于平台的适配器负责适当地填充这个规范模型。例如，在 Pilot 中的 Kubernetes 适配器实现了必要的控制器，来观察 Kubernetes API 服务器，用于更改 pod 的注册信息、入口资源以及存储流量管理规则的第三方资源。这些数据被转换为规范表示。然后根据规范表示生成特定的 Envoy 的配置。
+- [虚拟服务](#virtual-services)
+- [目标规则](#destination-rules)
+- [网关](#gateways)
+- [服务入口](#service-entries)
+- [Sidecar](#sidecars)
 
-Pilot 公开了用于服务发现 、负载均衡池和路由表的动态更新的 API。
+指南也对构建在 API 资源内的[网络弹性和测试](#network-resilience-and-testing)做了概述。
 
-运维人员可以通过 [Pilot 的 Rules API](/docs/reference/config/networking/) 指定高级流量管理规则。这些规则被翻译成低级配置，并通过 discovery API 分发到 Envoy 实例。
+## 虚拟服务 {#virtual-services}
 
-## 请求路由
+[虚拟服务（Virtual Service）](/zh/docs/reference/config/networking/virtual-service/#VirtualService) 和[目标规则（Destination Rule）](#destination-rules) 是 Istio 流量路由功能的关键拼图。虚拟服务让您配置如何在服务网格内将请求路由到服务，这基于 Istio 和平台提供的基本的连通性和服务发现能力。每个虚拟服务包含一组路由规则，Istio 按顺序评估它们，Istio 将每个给定的请求匹配到虚拟服务指定的实际目标地址。您的网格可以有多个虚拟服务，也可以没有，取决于您的使用场景。
 
-如 [Pilot](#pilot-和-envoy) 所述，特定网格中服务的规范表示由 Pilot 维护。服务的 Istio 模型和在底层平台（Kubernetes、Mesos 以及 Cloud Foundry 等）中的表达无关。特定平台的适配器负责从各自平台中获取元数据的各种字段，然后对服务模型进行填充。
+### 为什么使用虚拟服务？{#why-use-virtual-services}
 
-Istio 引入了服务版本的概念，可以通过版本（`v1`、`v2`）或环境（`staging`、`prod`）对服务进行进一步的细分。这些版本不一定是不同的 API 版本：它们可能是部署在不同环境（prod、staging 或者 dev 等）中的同一服务的不同迭代。使用这种方式的常见场景包括 A/B 测试或金丝雀部署。Istio 的[流量路由规则](#规则配置)可以根据服务版本来对服务之间流量进行附加控制。
+虚拟服务在增强 Istio 流量管理的灵活性和有效性方面，发挥着至关重要的作用，通过对客户端请求的目标地址与真实响应请求的目标工作负载进行解耦来实现。虚拟服务同时提供了丰富的方式，为发送至这些工作负载的流量指定不同的路由规则。
 
-### 服务之间的通讯
+为什么这如此有用？就像在介绍中所说，如果没有虚拟服务，Envoy 会在所有的服务实例中使用轮询的负载均衡策略分发请求。您可以用您对工作负载的了解来改善这种行为。例如，有些可能代表不同的版本。这在 A/B 测试中可能有用，您可能希望在其中配置基于不同服务版本的流量百分比路由，或指引从内部用户到特定实例集的流量。
 
-{{< image width="60%"
-    link="./ServiceModel_Versions.svg"
-    alt="服务版本的处理。"
-    caption="服务版本"
-    >}}
+使用虚拟服务，您可以为一个或多个主机名指定流量行为。在虚拟服务中使用路由规则，告诉 Envoy 如何发送虚拟服务的流量到适当的目标。路由目标地址可以是同一服务的不同版本，也可以是完全不同的服务。
 
-如上图所示，服务的客户端不知道服务不同版本间的差异。它们可以使用服务的主机名或者 IP 地址继续访问服务。Envoy sidecar/代理拦截并转发客户端和服务器之间的所有请求和响应。
+一个典型的用例是将流量发送到被指定为服务子集的服务的不同版本。客户端将虚拟服务视为一个单一实体，将请求发送至虚拟服务主机，然后 Envoy 根据虚拟服务规则把流量路由到不同的版本。例如，“20% 的调用转到新版本”或“将这些用户的调用转到版本 2”。这允许您创建一个金丝雀发布，逐步增加发送到新版本服务的流量百分比。流量路由完全独立于实例部署，这意味着实现新版本服务的实例可以根据流量的负载来伸缩，完全不影响流量路由。相比之下，像 Kubernetes 这样的容器编排平台只支持基于实例缩放的流量分发，这会让情况变得复杂。您可以在[使用 Istio 进行金丝雀部署](/zh/blog/2017/0.1-canary/)的文章里阅读到更多用虚拟服务实现金丝雀部署的内容。
 
-运维人员使用 Pilot 指定路由规则，Envoy 根据这些规则动态地确定其服务版本的实际选择。该模型使应用程序代码能够将它从其依赖服务的演进中解耦出来，同时提供其他好处（参见 [Mixer](/zh/docs/concepts/policies-and-telemetry/)）。路由规则让 Envoy 能够根据诸如 header、与源/目的地相关联的标签和/或分配给每个版本的权重等标准来进行版本选择。
+虚拟服务可以让您：
 
-Istio 还为同一服务版本的多个实例提供流量负载均衡。可以在[服务发现和负载均衡](/zh/docs/concepts/traffic-management/#服务发现和负载均衡)中找到更多信息。
+-   通过单个虚拟服务处理多个应用程序服务。如果您的网格使用 Kubernetes，可以配置一个虚拟服务处理特定命名空间中的所有服务。映射单一的虚拟服务到多个“真实”服务特别有用，可以在不需要客户适应转换的情况下，将单体应用转换为微服务构建的复合应用系统。您的路由规则可以指定为“对这些 `monolith.com` 的 URI 调用转到`microservice A`”等等。您可以在[下面的一个示例](#more-about-routing-rules)看到它是如何工作的。
+-   和[网关](/zh/docs/concepts/traffic-management/#gateways)整合并配置流量规则来控制出入流量。
 
-Istio 不提供 DNS。应用程序可以尝试使用底层平台（`kube-dns`、`mesos-dns` 等）中存在的 DNS 服务来解析 FQDN。
+在某些情况下，您还需要配置目标规则来使用这些特性，因为这是指定服务子集的地方。在一个单独的对象中指定服务子集和其它特定目标策略，有利于在虚拟服务之间更简洁地重用这些规则。在下一章节您可以找到更多关于目标规则的内容。
 
-### Ingress 和 Egress
+### 虚拟服务示例 {#virtual-service-example}
 
-Istio 假定进入和离开服务网络的所有流量都会通过 Envoy 代理进行传输。通过将 Envoy 代理部署在服务之前，运维人员可以针对面向用户的服务进行 A/B 测试、部署金丝雀服务等。类似地，通过使用 Envoy 将流量路由到外部 Web 服务（例如，访问 Maps API 或视频服务 API）的方式，运维人员可以为这些服务添加超时控制、重试、断路器等功能，同时还能从服务连接中获取各种细节指标。
-
-{{< image width="85%"
-    link="./ServiceModel_RequestFlow.svg"
-    alt="通过 Envoy 的 Ingress 和 Egress。"
-    caption="请求流"
-    >}}
-
-## 服务发现和负载均衡
-
-Istio 负载均衡服务网格中实例之间的通信。
-
-Istio 假定存在服务注册表，以追踪应用程序中服务的 pod/VM。它还假设服务的新实例自动注册到服务注册表，并且不健康的实例将被自动删除。诸如 Kubernetes、Mesos 等平台已经为基于容器的应用程序提供了这样的功能。为基于虚拟机的应用程序提供的解决方案就更多了。
-
-Pilot 使用来自服务注册的信息，并提供与平台无关的服务发现接口。网格中的 Envoy 实例执行服务发现，并相应地动态更新其负载均衡池。
-
-{{< image width="55%"
-    link="./LoadBalancing.svg"
-    caption="发现与负载均衡">}}
-
-如上图所示，网格中的服务使用其 DNS 名称访问彼此。服务的所有 HTTP 流量都会通过 Envoy 自动重新路由。Envoy 在负载均衡池中的实例之间分发流量。虽然 Envoy 支持多种[复杂的负载均衡算法](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancing)，但 Istio 目前仅允许三种负载均衡模式：轮询、随机和带权重的最少请求。
-
-除了负载均衡外，Envoy 还会定期检查池中每个实例的运行状况。Envoy 遵循熔断器风格模式，根据健康检查 API 调用的失败率将实例分类为不健康和健康两种。换句话说，当给定实例的健康检查失败次数超过预定阈值时，将会被从负载均衡池中弹出。类似地，当通过的健康检查数超过预定阈值时，该实例将被添加回负载均衡池。您可以在[处理故障](#故障处理)中了解更多有关 Envoy 的故障处理功能。
-
-服务可以通过使用 HTTP 503 响应健康检查来主动减轻负担。在这种情况下，服务实例将立即从调用者的负载均衡池中删除。
-
-## 故障处理
-
-Envoy 提供了一套开箱即用，**可选的**的故障恢复功能，对应用中的服务大有裨益。这些功能包括：
-
-1. 超时
-
-1. 具备超时预算，并能够在重试之间进行可变抖动（间隔）的有限重试功能
-
-1. 并发连接数和上游服务请求数限制
-
-1. 对负载均衡池中的每个成员主动（定期）运行健康检查
-
-1. 细粒度熔断器（被动健康检查）——适用于负载均衡池中的每个实例
-
-这些功能可以使用 [Istio 的流量管理规则](#规则配置)在运行时进行动态配置。
-
-对超载的上游服务来说，重试之间的抖动极大的降低了重试造成的影响，而超时预算确保调用方服务在可预测的时间范围内获得响应（成功/失败）。
-
-主动和被动健康检查（上述 4 和 5 ）的组合最大限度地减少了在负载均衡池中访问不健康实例的机会。当将其与平台级健康检查（例如由 Kubernetes 或 Mesos 支持的检查）相结合时， 可以确保应用程序将不健康的 Pod/容器/虚拟机快速地从服务网格中去除，从而最小化请求失败和延迟产生影响。
-
-总之，这些功能使得服务网格能够耐受故障节点，并防止本地故障导致的其他节点的稳定性下降。
-
-### 微调
-
-Istio 的流量管理规则允许运维人员为每个服务/版本设置故障恢复的全局默认值。然而，服务的消费者也可以通过特殊的 HTTP 头提供的请求级别值覆盖[超时](/docs/reference/config/networking/v1alpha3/virtual-service/#HTTPRoute-timeout)和[重试](/docs/reference/config/networking/v1alpha3/virtual-service/#HTTPRoute-retries)的默认值。在 Envoy 代理的实现中，对应的 Header 分别是 `x-envoy-upstream-rq-timeout-ms` 和 `x-envoy-max-retries`。
-
-### FAQ
-
-Q: *在 Istio 中运行的应用程序是否仍需要处理故障？*
-
-是的。Istio可以提高网格中服务的可靠性和可用性。但是，**应用程序仍然需要处理故障（错误）并采取适当的回退操作**。例如，当负载均衡池中的所有实例都失败时，Envoy 将返回 HTTP 503。应用程序有责任实现必要的逻辑，对这种来自上游服务的 HTTP 503 错误做出合适的响应。
-
-Q: *已经使用容错库（例如 [Hystrix](https://github.com/Netflix/Hystrix)）的应用程序，是否会因为 Envoy 的故障恢复功能受到破坏？*
-
-不会。Envoy对应用程序是完全透明的。在进行服务调用时，由 Envoy 返回的故障响应与上游服务返回的故障响应不会被区分开来。
-
-Q: *同时使用应用级库和 Envoy 时，怎样处理故障？*
-
-假如对同一个目的服务给出两个故障恢复策略（例如，两次超时设置——一个在 Envoy 中设置，另一个在应用程序库中设置），**当故障发生时，将触发两者中更严格的那个**。例如，如果应用程序为服务的 API 调用设置了 5 秒的超时时间，而运维人员给 Envoy 配置了 10 秒的超时时间，那么应用程序的超时将会首先启动。同样，如果 Envoy 的熔断器在应用熔断器之前触发，对该服务的 API 调用将从 Envoy 收到 503 错误。
-
-## 故障注入
-
-虽然 Envoy sidecar/proxy 为在 Istio 上运行的服务提供了大量的[故障恢复机制](#故障处理)，但测试整个应用程序端到端的故障恢复能力依然是必须的。错误配置的故障恢复策略（例如，跨服务调用的不兼容/限制性超时）可能导致应用程序中的关键服务持续不可用，从而破坏用户体验。
-
-Istio 能在不杀死 Pod 的情况下，将特定协议的故障注入到网络中，在 TCP 层制造数据包的延迟或损坏。我们的理由是，无论网络级别的故障如何，应用层观察到的故障都是一样的，并且可以在应用层注入更有意义的故障（例如，HTTP 错误代码），以检验和改善应用的弹性。
-
-运维人员可以为符合特定条件的请求配置故障，还可以进一步限制遭受故障的请求的百分比。可以注入两种类型的故障：延迟和中断。延迟是计时故障，模拟网络延迟上升或上游服务超载的情况。中断是模拟上游服务的崩溃故障。中断通常以 HTTP 错误代码或 TCP 连接失败的形式表现。
-
-## 规则配置
-
-Istio 提供了一个简单的配置模型，用来控制 API 调用以及应用部署内多个服务之间的四层通信。运维人员可以使用这个模型来配置服务级别的属性，这些属性可以是断路器、超时、重试，以及一些普通的持续发布任务，例如金丝雀发布、A/B 测试、使用百分比对流量进行控制，从而完成应用的逐步发布等。
-
-Istio 中包含有四种流量管理配置资源，分别是 `VirtualService`、`DestinationRule`、`ServiceEntry` 以及 `Gateway`。下面会讲一下这几个资源的一些重点。在[网络参考](/docs/reference/config/networking/)中可以获得更多这方面的信息。
-
-* [`VirtualService`](/docs/reference/config/networking/v1alpha3/virtual-service/) 在 Istio 服务网格中定义路由规则，控制路由如何路由到服务上。
-
-* [`DestinationRule`](/docs/reference/config/networking/v1alpha3/destination-rule/) 是 `VirtualService` 路由生效后，配置应用与请求的策略集。
-
-* [`ServiceEntry`](/docs/reference/config/networking/v1alpha3/service-entry/) 是通常用于在 Istio 服务网格之外启用对服务的请求。
-
-* [`Gateway`](/docs/reference/config/networking/v1alpha3/gateway/) 为 HTTP/TCP 流量配置负载均衡器，最常见的是在网格的边缘的操作，以启用应用程序的入口流量。
-
-例如，将 `reviews` 服务接收到的流量 100% 地发送到 `v1` 版本，这一需求可以用下面的规则来实现：
+下面的虚拟服务根据请求是否来自特定的用户，把它们路由到服务的不同版本。
 
 {{< text yaml >}}
 apiVersion: networking.istio.io/v1alpha3
@@ -162,71 +73,123 @@ spec:
   hosts:
   - reviews
   http:
+  - match:
+    - headers:
+        end-user:
+          exact: jason
+    route:
+    - destination:
+        host: reviews
+        subset: v2
   - route:
     - destination:
         host: reviews
-        subset: v1
+        subset: v3
 {{< /text >}}
 
-这个配置的用意是，发送到 `reviews` 服务（在 `hosts` 字段中标识）的流量应该被路由到 `reviews` 服务实例的 `v1` 子集中。路由中的 `subset` 制定了一个预定义的子集名称，子集的定义来自于目标规则配置：
+#### hosts 字段 {#the-hosts-field}
 
-子集指定了一个或多个特定版本的实例标签。例如，在 Kubernetes 中部署 Istio 时，“version: v1” 表示只有包含 “version: v1” 标签版本的 pod 才会接收流量。
-
-在 `DestinationRule` 中，你可以添加其他策略，例如：下面的定义指定使用随机负载均衡模式：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: reviews
-spec:
-  host: reviews
-  trafficPolicy:
-    loadBalancer:
-      simple: RANDOM
-  subsets:
-  - name: v1
-    labels:
-      version: v1
-  - name: v2
-    labels:
-      version: v2
-{{< /text >}}
-
-可以使用 `kubectl` 命令配置规则。在[配置请求路由任务](/docs/tasks/traffic-management/request-routing/)中包含有配置示例。
-
-以下部分提供了流量管理配置资源的基本概述。详细信息请查看[网络参考](/docs/reference/config/networking/)。
-
-## Virtual Service
-
-[`VirtualService`](/docs/reference/config/networking/v1alpha3/virtual-service/) 定义了控制在 Istio 服务网格中如何路由服务请求的规则。例如一个 Virtual Service 可以把请求路由到不同版本，甚至是可以路由到一个完全不同于请求要求的服务上去。路由可以用很多条件进行判断，例如请求的源和目的地、HTTP 路径和 Header 以及各个服务版本的权重等。
-
-### 规则的目标描述
-
-路由规则对应着一或多个用 `VirtualService` 配置指定的请求目的主机。这些主机可以是也可以不是实际的目标负载，甚至可以不是同一网格内可路由的服务。例如要给到 `reviews` 服务的请求定义路由规则，可以使用内部的名称 `reviews`，也可以用域名 `bookinfo.com`，`VirtualService` 可以定义这样的 `hosts` 字段：
+使用 `hosts` 字段列举虚拟服务的主机——即用户指定的目标或是路由规则设定的目标。这是客户端向服务发送请求时使用的一个或多个地址。
 
 {{< text yaml >}}
 hosts:
-  - reviews
-  - bookinfo.com
+- reviews
 {{< /text >}}
 
-`hosts` 字段用显示或者隐式的方式定义了一或多个完全限定名（FQDN）。上面的 `reviews`，会隐式的扩展成为特定的 FQDN，例如在 Kubernetes 环境中，全名会从 `VirtualService` 所在的集群和命名空间中继承而来（比如说 `reviews.default.svc.cluster.local`）。
+虚拟服务主机名可以是 IP 地址、DNS 名称，或者依赖于平台的一个简称（例如 Kubernetes 服务的短名称），隐式或显式地指向一个完全限定域名（FQDN）。您也可以使用通配符（“\*”）前缀，让您创建一组匹配所有服务的路由规则。虚拟服务的 `hosts` 字段实际上不必是 Istio 服务注册的一部分，它只是虚拟的目标地址。这让您可以为没有路由到网格内部的虚拟主机建模。
 
-### 在服务之间分拆流量
+#### 路由规则 {#routing-rules}
 
-每个路由规则都需要对一或多个有权重的后端进行甄别并调用合适的后端。每个后端都对应一个特定版本的目标服务，服务的版本是依靠标签来区分的。如果一个服务版本包含多个注册实例，那么会根据为该服务定义的负载均衡策略进行路由，缺省策略是 `round-robin`。
+在 `http` 字段包含了虚拟服务的路由规则，用来描述匹配条件和路由行为，它们把 HTTP/1.1、HTTP2 和 gRPC 等流量发送到 hosts 字段指定的目标（您也可以用 `tcp` 和 `tls` 片段为 [TCP](/zh/docs/reference/config/networking/virtual-service/#TCPRoute) 和未终止的 [TLS](/zh/docs/reference/config/networking/virtual-service/#TLSRoute) 流量设置路由规则）。一个路由规则包含了指定的请求要流向哪个目标地址，具有 0 或多个匹配条件，取决于您的使用场景。
 
-例如下面的规则会把 25% 的 `reviews` 服务流量分配给 `v2` 标签；其余的 75% 流量分配给 `v1`：
+##### 匹配条件 {#match-condition}
+
+示例中的第一个路由规则有一个条件，因此以 `match` 字段开始。在本例中，您希望此路由应用于来自 ”jason“ 用户的所有请求，所以使用 `headers`、`end-user` 和 `exact` 字段选择适当的请求。
+
+{{< text yaml >}}
+- match:
+   - headers:
+       end-user:
+         exact: jason
+{{< /text >}}
+
+##### Destination {#destination}
+
+route 部分的 `destination` 字段指定了符合此条件的流量的实际目标地址。与虚拟服务的 `hosts` 不同，destination 的 host 必须是存在于 Istio 服务注册中心的实际目标地址，否则 Envoy 不知道该将请求发送到哪里。可以是一个有代理的服务网格，或者是一个通过服务入口被添加进来的非网格服务。本示例运行在 Kubernetes 环境中，host 名为一个 Kubernetes 服务名：
+
+{{< text yaml >}}
+route:
+- destination:
+    host: reviews
+    subset: v2
+{{< /text >}}
+
+请注意，在该示例和本页其它示例中，为了简单，我们使用 Kubernetes 的短名称设置 destination 的 host。在评估此规则时，Istio 会添加一个基于虚拟服务命名空间的域后缀，这个虚拟服务包含要获取主机的完全限定名的路由规则。在我们的示例中使用短名称也意味着您可以复制并在任何喜欢的命名空间中尝试它们。
+
+{{< warning >}}
+只有在目标主机和虚拟服务位于相同的 Kubernetes 命名空间时才可以使用这样的短名称。因为使用 Kubernetes 的短名称容易导致配置出错，我们建议您在生产环境中指定完全限定的主机名。
+{{< /warning >}}
+
+destination 片段还指定了 Kubernetes 服务的子集，将符合此规则条件的请求转入其中。在本例中子集名称是 v2。您可以在[目标规则](#destination-rules)章节中看到如何定义服务子集。
+
+#### 路由规则优先级 {#routing-rule-precedence}
+
+**路由规则**按从上到下的顺序选择，虚拟服务中定义的第一条规则有最高优先级。本示例中，不满足第一个路由规则的流量均流向一个默认的目标，该目标在第二条规则中指定。因此，第二条规则没有 match 条件，直接将流量导向 v3 子集。
+
+{{< text yaml >}}
+- route:
+  - destination:
+      host: reviews
+      subset: v3
+{{< /text >}}
+
+我们建议提供一个默认的“无条件”或基于权重的规则（见下文）作为每一个虚拟服务的最后一条规则，如案例所示，从而确保流经虚拟服务的流量至少能够匹配一条路由规则。
+
+### 路由规则的更多内容 {#more-about-routing-rules}
+
+正如上面所看到的，路由规则是将特定流量子集路由到指定目标地址的强大工具。您可以在流量端口、header 字段、URI 等内容上设置匹配条件。例如，这个虚拟服务让用户发送请求到两个独立的服务：ratings 和 reviews，就好像它们是 `http://bookinfo.com/` 这个更大的虚拟服务的一部分。虚拟服务规则根据请求的 URI 和指向适当服务的请求匹配流量。
 
 {{< text yaml >}}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: reviews
+  name: bookinfo
 spec:
   hosts:
-    - reviews
+    - bookinfo.com
+  http:
+  - match:
+    - uri:
+        prefix: /reviews
+    route:
+    - destination:
+        host: reviews
+  - match:
+    - uri:
+        prefix: /ratings
+    route:
+    - destination:
+        host: ratings
+...
+
+  http:
+  - match:
+      sourceLabels:
+        app: reviews
+    route:
+...
+{{< /text >}}
+
+有些匹配条件可以使用精确的值，如前缀或正则。
+
+您可以使用 AND 向同一个 `match` 块添加多个匹配条件，或者使用 OR 向同一个规则添加多个 `match` 块。对于任何给定的虚拟服务也可以有多个路由规则。这可以在单个虚拟服务中使路由条件变得随您所愿的复杂或简单。匹配条件字段和备选值的完整列表可以在 [`HTTPMatchRequest` 参考](/zh/docs/reference/config/networking/virtual-service/#HTTPMatchRequest)中找到。
+
+另外，使用匹配条件您可以按百分比”权重“分发请求。这在 A/B 测试和金丝雀发布中非常有用：
+
+{{< text yaml >}}
+spec:
+  hosts:
+  - reviews
   http:
   - route:
     - destination:
@@ -239,303 +202,43 @@ spec:
       weight: 25
 {{< /text >}}
 
-### 超时和重试
+您也可以使用路由规则在流量上执行一些操作，例如：
 
-缺省情况下，HTTP 请求的超时设置为 15 秒，可以使用路由规则来覆盖这个限制：
+-   添加或删除 header。
+-   重写 URL。
+-   为调用这一目标地址的请求设置[重试策略](#retries)。
 
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-    - ratings
-  http:
-  - route:
-    - destination:
-        host: ratings
-        subset: v1
-    timeout: 10s
-{{< /text >}}
+想了解如何利用这些操作，查看 [`HTTPRoute` 参考](/zh/docs/reference/config/networking/virtual-service/#HTTPRoute)。
 
-还可以用路由规则来指定某些 http 请求的重试次数。下面的代码可以用来设置最大重试次数，或者在规定时间内一直重试，时间长度同样可以进行覆盖：
+## 目标规则 {#destination-rules}
 
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-    - ratings
-  http:
-  - route:
-    - destination:
-        host: ratings
-        subset: v1
-    retries:
-      attempts: 3
-      perTryTimeout: 2s
-{{< /text >}}
+与[虚拟服务](#virtual-services)一样，[目标规则](/zh/docs/reference/config/networking/destination-rule/#DestinationRule)也是 Istio 流量路由功能的关键部分。您可以将虚拟服务视为将流量如何路由到给定目标地址，然后使用目标规则来配置该目标的流量。在评估虚拟服务路由规则之后，目标规则将应用于流量的“真实”目标地址。
 
-注意请求的重试和超时还可以[针对每个请求分别设置](/zh/docs/concepts/traffic-management/#微调)。
+特别是，您可以使用目标规则来指定命名的服务子集，例如按版本为所有给定服务的实例分组。然后可以在虚拟服务的路由规则中使用这些服务子集来控制到服务不同实例的流量。
 
-[请求超时任务](/zh/docs/tasks/traffic-management/request-timeouts/)中展示了超时控制的相关示例。
+目标规则还允许您在调用整个目的地服务或特定服务子集时定制 Envoy 的流量策略，比如您喜欢的负载均衡模型、TLS 安全模式或熔断器设置。在[目标规则参考](/zh/docs/reference/config/networking/destination-rule/)中可以看到目标规则选项的完整列表。
 
-### 错误注入
+### 负载均衡选项 {#load-balancing-options}
 
-在根据路由规则向选中目标转发 http 请求的时候，可以向其中注入一或多个错误。错误可以是延迟，也可以是退出。
+默认情况下，Istio 使用轮询的负载均衡策略，实例池中的每个实例依次获取请求。Istio 同时支持如下的负载均衡模型，可以在 `DestinationRule` 中为流向某个特定服务或服务子集的流量指定这些模型。
 
-下面的例子在目标为 `ratings:v1` 服务的流量中，对其中的 10% 注入 5 秒钟的延迟。
+-   随机：请求以随机的方式转到池中的实例。
+-   权重：请求根据指定的百分比转到实例。
+-   最少请求：请求被转到最少被访问的实例。
 
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - fault:
-      delay:
-        percent: 10
-        fixedDelay: 5s
-    route:
-    - destination:
-        host: ratings
-        subset: v1
-{{< /text >}}
+查看 [Envoy 负载均衡文档](https://www.envoyproxy.io/docs/envoy/v1.5.0/intro/arch_overview/load_balancing)获取这部分的更多信息。
 
-可以使用其他类型的故障，终止、提前终止请求。例如，模拟失败。
+### 目标规则示例 {#destination-rule-example}
 
-接下来，在目标为 `ratings:v1` 服务的流量中，对其中的 10% 注入 HTTP 400 错误。
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - fault:
-      abort:
-        percent: 10
-        httpStatus: 400
-    route:
-    - destination:
-        host: ratings
-        subset: v1
-{{< /text >}}
-
-有时会把延迟和退出同时使用。例如下面的规则对从 `reviews:v2` 到 `ratings:v1` 的流量生效，会让所有的请求延迟 5 秒钟，接下来把其中的 10% 退出：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - match:
-    - sourceLabels:
-        app: reviews
-        version: v2
-    fault:
-      delay:
-        fixedDelay: 5s
-      abort:
-        percent: 10
-        httpStatus: 400
-    route:
-    - destination:
-        host: ratings
-        subset: v1
-{{< /text >}}
-
-可以参考[错误注入任务](/zh/docs/tasks/traffic-management/fault-injection/)，进行这方面的实际体验。
-
-### 条件规则
-
-可以选择让规则只对符合某些要求的请求生效：
-
-__1. 使用工作负载 label 限制特定客户端工作负载__。例如，规则可以指示它仅适用于实现 `reviews` 服务的工作负载实例（pod）的调用：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - match:
-      sourceLabels:
-        app: reviews
-    ...
-{{< /text >}}
-
-`sourceLabels` 的值取决于服务的实现。例如，在 Kubernetes 中，它可能与相应 Kubernetes 服务的 pod 选择器中使用的 label 相同。
-
-以上示例还可以进一步细化为仅适用于 `reviews` 服务版本 `v2` 负载均衡实例的调用：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - match:
-    - sourceLabels:
-        app: reviews
-        version: v2
-    ...
-{{< /text >}}
-
-__2. 根据 HTTP Header 选择规则__。下面的规则只会对包含了 `end-user` 标头的来源请求，且值为 `jason` 的请求生效：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: reviews
-spec:
-  hosts:
-    - reviews
-  http:
-  - match:
-    - headers:
-        end-user:
-          exact: jason
-    ...
-{{< /text >}}
-
-如果规则中指定了多个标头，则所有相应的标头必须匹配才能应用规则。
-
-__3. 根据请求URI选择规则__。例如，如果 URI 路径以 `/api/v1` 开头，则以下规则仅适用于请求：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: productpage
-spec:
-  hosts:
-    - productpage
-  http:
-  - match:
-    - uri:
-        prefix: /api/v1
-    ...
-{{< /text >}}
-
-### 多重匹配条件
-
-可以同时设置多个匹配条件。在这种情况下，根据嵌套，应用 AND 或 OR 语义。
-
-如果多个条件嵌套在单个匹配子句中，则条件为 AND。例如，以下规则仅适用于客户端工作负载为 `reviews:v2` 且请求中包含 `jason` 的自定义 `end-user` 标头：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - match:
-    - sourceLabels:
-        app: reviews
-        version: v2
-      headers:
-        end-user:
-          exact: jason
-    ...
-{{< /text >}}
-
-相反，如果条件出现在单独的匹配子句中，则只应用其中一个条件（OR 语义）：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: ratings
-spec:
-  hosts:
-  - ratings
-  http:
-  - match:
-    - sourceLabels:
-        app: reviews
-        version: v2
-    - headers:
-        end-user:
-          exact: jason
-    ...
-{{< /text >}}
-
-如果客户端工作负载是 `reviews:v2`，或者请求中包含 `jason` 的自定义 `end-user` 标头，则适用此规则。
-
-### 优先级
-
-当对同一目标有多个规则时，会按照在 `VirtualService` 中的顺序进行应用，换句话说，列表中的第一条规则具有最高优先级。
-
-**为什么优先级很重要：**当对某个服务的路由是完全基于权重的时候，就可以在单一规则中完成。另一方面，如果有多重条件（例如来自特定用户的请求）用来进行路由，就会需要不止一条规则。这样就出现了优先级问题，需要通过优先级来保证根据正确的顺序来执行规则。
-
-常见的路由模式是提供一或多个高优先级规则，这些优先规则使用源服务以及 Header 来进行路由判断，然后才提供一条单独的基于权重的规则，这些低优先级规则不设置匹配规则，仅根据权重对所有剩余流量进行分流。
-
-例如下面的 `VirtualService` 包含了两个规则，所有对 `reviews` 服务发起的请求，如果 Header 包含 `Foo=bar`，就会被路由到 `v2` 实例，而其他请求则会发送给 `v1` ：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: reviews
-spec:
-  hosts:
-  - reviews
-  http:
-  - match:
-    - headers:
-        Foo:
-          exact: bar
-    route:
-    - destination:
-        host: reviews
-        subset: v2
-  - route:
-    - destination:
-        host: reviews
-        subset: v1
-{{< /text >}}
-
-注意，基于 Header 的规则具有更高优先级。如果降低它的优先级，那么这一规则就无法生效了，这是因为那些没有限制的权重规则会首先被执行，也就是说所有请求即使包含了符合条件的 `Foo` 头，也都会被路由到 `v1`。流量特征被判断为符合一条规则的条件的时候，就会结束规则的选择过程，这就是在存在多条规则时，需要慎重考虑优先级问题的原因。
-
-## 目标规则
-
-在请求被 `VirtualService` 路由之后，[`DestinationRule`](/docs/reference/config/networking/v1alpha3/destination-rule/) 配置的一系列策略就生效了。这些策略由服务属主编写，包含断路器、负载均衡以及 TLS 等的配置内容。
-
-`DestinationRule` 还定义了对应目标主机的可路由 `subset`（例如有命名的版本）。`VirtualService` 在向特定服务版本发送请求时会用到这些子集。
-
-下面是 `reviews` 服务的 `DestinationRule` 配置策略以及子集：
+在下面的示例中，目标规则为 `my-svc` 目标服务配置了 3 个具有不同负载均衡策略的子集：
 
 {{< text yaml >}}
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
-  name: reviews
+  name: my-destination-rule
 spec:
-  host: reviews
+  host: my-svc
   trafficPolicy:
     loadBalancer:
       simple: RANDOM
@@ -554,191 +257,252 @@ spec:
       version: v3
 {{< /text >}}
 
-注意在单个 `DestinationRule` 配置中可以包含多条策略（比如 default 和 v2）。
+每个子集都是基于一个或多个 `labels` 定义的，在 Kubernetes 中它是附加到像 Pod 这种对象上的键/值对。这些标签应用于 Kubernetes 服务的 Deployment 并作为 `metadata` 来识别不同的版本。
 
-### 断路器
+除了定义子集之外，目标规则对于所有子集都有默认的流量策略，而对于该子集，则有特定于子集的策略覆盖它。定义在 `subsets` 上的默认策略，为 `v1` 和 `v3` 子集设置了一个简单的随机负载均衡器。在 `v2` 策略中，轮询负载均衡器被指定在相应的子集字段上。
 
-可以用一系列的标准，例如连接数和请求数限制来定义简单的断路器。
+## 网关 {#gateways}
 
-例如下面的 `DestinationRule` 给 `reviews` 服务的 `v1` 版本设置了 100 连接的限制：
+使用[网关](/zh/docs/reference/config/networking/gateway/#Gateway)为网格来管理入站和出站流量，可以让您指定要进入或离开网格的流量。网关配置被用于运行在网格边界的独立 Envoy 代理，而不是服务工作负载的 sidecar 代理。
 
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: reviews
-spec:
-  host: reviews
-  subsets:
-  - name: v1
-    labels:
-      version: v1
-    trafficPolicy:
-      connectionPool:
-        tcp:
-          maxConnections: 100
-{{< /text >}}
+与 Kubernetes Ingress API 这种控制进入系统流量的其他机制不同，Istio 网关让您充分利用流量路由的强大能力和灵活性。您可以这么做的原因是 Istio 的网关资源可以配置 4-6 层的负载均衡属性，如对外暴露的端口、TLS 设置等。作为替代应用层流量路由（L7）到相同的 API 资源，您绑定了一个常规的 Istio [虚拟服务](#virtual-services)到网关。这让您可以像管理网格中其他数据平面的流量一样去管理网关流量。
 
-查看断路器演示请查看 [断路器任务](/zh/docs/tasks/traffic-management/circuit-breaking/)
+网关主要用于管理进入的流量，但您也可以配置出口网关。出口网关让您为离开网格的流量配置一个专用的出口节点，这可以限制哪些服务可以或应该访问外部网络，或者启用[出口流量安全控制](/zh/blog/2019/egress-traffic-control-in-istio-part-1/)为您的网格添加安全性。您也可以使用网关配置一个纯粹的内部代理。
 
-### 规则评估
+Istio 提供了一些预先配置好的网关代理部署（`istio-ingressgateway` 和 `istio-egressgateway`）供您使用——如果使用我们的[演示安装](/zh/docs/setup/getting-started/)它们都已经部署好了；如果使用[默认或 sds 配置文件](/zh/docs/setup/additional-setup/config-profiles/)则只部署了入口网关。可以将您自己的网关配置应用到这些部署或配置您自己的网关代理。
 
-和路由规则类似，`DestinationRule` 中定义的策略也是和特定的 `host` 相关联的，如果指定了 `subset`，那么具体生效的 `subset` 的决策是由路由规则来决定的。
+### Gateway 示例 {#gateway-example}
 
-规则评估的第一步，是确认 `VirtualService` 中所请求的主机相对应的路由规则（如果有的话），这一步骤决定了将请求发往目标服务的哪一个 `subset`（就是特定版本）。下一步，被选中的 `subset` 如果定义了策略，就会开始是否生效的评估。
-
-**注意：**这一算法需要留心是，为特定 `subset` 定义的策略，只有在该 `subset` 被显式的路由时候才能生效。例如下面的配置，只为 `review` 服务定义了规则（没有对应的 `VirtualService` 路由规则）。
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: reviews
-spec:
-  host: reviews
-  subsets:
-  - name: v1
-    labels:
-      version: v1
-    trafficPolicy:
-      connectionPool:
-        tcp:
-          maxConnections: 100
-{{< /text >}}
-
-既然没有为 `reviews` 服务定义路由规则，那么就会使用缺省的 `round-robin` 策略，偶尔会请求到 `v1` 实例，如果只有一个 `v1` 实例，那么所有请求都会发送给它。然而上面的策略是永远不会生效的，这是因为，缺省路由是在更底层完成的任务，策略引擎无法获知最终目的，也无法为请求选择匹配的 `subset` 策略。
-
-有两种方法来解决这个问题。可以把路由策略提高一级，要求他对所有版本生效：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: reviews
-spec:
-  host: reviews
-  trafficPolicy:
-    connectionPool:
-      tcp:
-        maxConnections: 100
-  subsets:
-  - name: v1
-    labels:
-      version: v1
-{{< /text >}}
-
-还有一个更好的方法，就是为服务定义路由规则，例如给 `reviews:v1` 加入一个简单的路由规则：
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: reviews
-spec:
-  hosts:
-  - reviews
-  http:
-  - route:
-    - destination:
-        host: reviews
-        subset: v1
-{{< /text >}}
-
-虽然 Istio 在没有定义任何规则的情况下，能将所有来源的流量发送给所有版本的目标服务。然而一旦需要对版本有所区别，就需要制定规则了。从一开始就给每个服务设置缺省规则，是 Istio 世界里推荐的最佳实践。
-
-### Service Entry
-
-Istio 内部会维护一个服务注册表，可以用 [`ServiceEntry`](/docs/reference/config/networking/v1alpha3/service-entry/) 向其中加入额外的条目。通常这个对象用来启用对 Istio 服务网格之外的服务发出请求。例如下面的 `ServiceEntry` 可以用来允许外部对 `*.foo.com` 域名上的服务主机的调用。
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: ServiceEntry
-metadata:
-  name: foo-ext-svc
-spec:
-  hosts:
-  - "*.foo.com"
-  ports:
-  - number: 80
-    name: http
-    protocol: HTTP
-  - number: 443
-    name: https
-    protocol: HTTPS
-{{< /text >}}
-
-`ServiceEntry` 中使用 `hosts` 字段来指定目标，字段值可以是一个完全限定名，也可以是个通配符域名。其中包含的白名单，包含一或多个允许网格中服务访问的服务。
-
-`ServiceEntry` 的配置不仅限于外部服务，它有两种类型：网格内部和网格外部。网格内的条目和其他的内部服务类似，用于显式的将服务加入网格。可以用来把服务作为服务网格扩展的一部分加入不受管理的基础设置（例如加入到基于 Kubernetes 的服务网格中的虚拟机）中。网格外的条目用于表达网格外的服务。对这种条目来说，双向 TLS 认证被禁用，策略实现需要在客户端执行，而不像内部服务请求那样在服务端执行。
-
-只要 `ServiceEntry` 涉及到了匹配 `hosts` 的服务，就可以和 `VirtualService` 以及 `DestinationRule` 配合工作。例如下面的规则可以和上面的 `ServiceEntry` 同时使用，在访问 `bar.foo.com` 的外部服务时，设置一个 10 秒钟的超时。
-
-{{< text yaml >}}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: bar-foo-ext-svc
-spec:
-  hosts:
-    - bar.foo.com
-  http:
-  - route:
-    - destination:
-        host: bar.foo.com
-    timeout: 10s
-{{< /text >}}
-
-流量的重定向和转发、定义重试和超时以及错误注入策略都支持外部目标。然而由于外部服务没有多版本的概念，因此权重（基于版本）路由就无法实现了。
-
-参照 [egress 任务](/zh/docs/tasks/traffic-management/egress/)可以了解更多的访问外部服务方面的知识。
-
-### Gateway
-
-[Gateway](/docs/reference/config/networking/v1alpha3/gateway/) 为 HTTP/TCP 流量配置了一个负载均衡，多数情况下在网格边缘进行操作，用于启用一个服务的入口（ingress）流量。
-
-和 Kubernetes Ingress 不同，Istio `Gateway` 只配置四层到六层的功能（例如开放端口或者 TLS 配置）。绑定一个 `VirtualService` 到 `Gateway` 上，用户就可以使用标准的 Istio 规则来控制进入的 HTTP 和 TCP 流量。
-
-例如下面提供一个简单的 `Gateway` 代码，配合一个负载均衡，允许外部针对主机 `bookinfo.com` 的 https 流量：
+下面的示例展示了一个外部 HTTPS 入口流量的网关配置：
 
 {{< text yaml >}}
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: bookinfo-gateway
+  name: ext-host-gwy
 spec:
+  selector:
+    app: my-gateway-controller
   servers:
   - port:
       number: 443
       name: https
       protocol: HTTPS
     hosts:
-    - bookinfo.com
+    - ext-host.example.com
     tls:
       mode: SIMPLE
       serverCertificate: /tmp/tls.crt
       privateKey: /tmp/tls.key
 {{< /text >}}
 
-要为 `Gateway` 配置对应的路由，必须为定义一个同样 `hosts` 定义的 `VirtualService`，其中用 `gateways` 字段来绑定到定义好的 `Gateway` 上：
+这个网关配置让 HTTPS 流量从 `ext-host.example.com` 通过 443 端口流入网格，但没有为请求指定任何路由规则。为想要工作的网关指定路由，您必须把网关绑定到虚拟服务上。正如下面的示例所示，使用虚拟服务的 `gateways` 字段进行设置：
 
 {{< text yaml >}}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: bookinfo
+  name: virtual-svc
 spec:
   hosts:
-    - bookinfo.com
+  - ext-host.example.com
   gateways:
-  - bookinfo-gateway # <---- 绑定到 Gateway
-  http:
-  - match:
-    - uri:
-        prefix: /reviews
-    route:
-    ...
+    - ext-host-gwy
 {{< /text >}}
 
-在 [Ingress 任务](/zh/docs/tasks/traffic-management/ingress/) 中有完整的 Ingress Gateway 例子。
+然后就可以为出口流量配置带有路由规则的虚拟服务。
 
-虽然主要用于管理入口（Ingress）流量，`Gateway` 还可以用在纯粹的内部服务之间或者出口（Egress）场景下使用。不管处于什么位置，所有的网关都可以以同样的方式进行配置和控制。[Gateway 参考](/docs/reference/config/networking/v1alpha3/gateway/) 中包含更多细节描述。
+## 服务入口 {#service-entries}
+
+使用[服务入口（Service Entry）](/zh/docs/reference/config/networking/service-entry/#ServiceEntry) 来添加一个入口到 Istio 内部维护的服务注册中心。添加了服务入口后，Envoy 代理可以向服务发送流量，就好像它是网格内部的服务一样。配置服务入口允许您管理运行在网格外的服务的流量，它包括以下几种能力：
+
+-   为外部目标 redirect 和转发请求，例如来自 web 端的 API 调用，或者流向遗留老系统的服务。
+-   为外部目标定义[重试](#retries)、[超时](#timeouts)和[故障注入](#fault-injection)策略。
+-   添加一个运行在虚拟机的服务来[扩展您的网格](/zh/docs/examples/virtual-machines/single-network/#running-services-on-the-added-VM)。
+-   从逻辑上添加来自不同集群的服务到网格，在 Kubernetes 上实现一个[多集群 Istio 网格](/zh/docs/setup/install/multicluster)。
+
+您不需要为网格服务要使用的每个外部服务都添加服务入口。默认情况下，Istio 配置 Envoy 代理将请求传递给未知服务。但是，您不能使用 Istio 的特性来控制没有在网格中注册的目标流量。
+
+### 服务入口示例 {#service-entry-example}
+
+下面示例的 mesh-external 服务入口将 `ext-resource` 外部依赖项添加到 Istio 的服务注册中心：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: svc-entry
+spec:
+  hosts:
+  - ext-svc.example.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+{{< /text >}}
+
+您指定的外部资源使用 `hosts` 字段。可以使用完全限定名或通配符作为前缀域名。
+
+您可以配置虚拟服务和目标规则，以更细粒度的方式控制到服务入口的流量，这与网格中的任何其他服务配置流量的方式相同。例如，下面的目标规则配置流量路由以使用双向 TLS 来保护到 `ext-svc.example.com` 外部服务的连接，我们使用服务入口配置了该外部服务：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ext-res-dr
+spec:
+  host: ext-svc.example.com
+  trafficPolicy:
+    tls:
+      mode: MUTUAL
+      clientCertificate: /etc/certs/myclientcert.pem
+      privateKey: /etc/certs/client_private_key.pem
+      caCertificates: /etc/certs/rootcacerts.pem
+{{< /text >}}
+
+查看[服务入口参考](/zh/docs/reference/config/networking/service-entry)获取更多可能的配置项。
+
+## Sidecar {#sidecars}
+
+默认情况下，Istio 让每个 Envoy 代理都可以访问来自和它关联的工作负载的所有端口的请求，然后转发到对应的工作负载。您可以使用 [sidecar](/zh/docs/reference/config/networking/sidecar/#Sidecar) 配置去做下面的事情：
+
+-   微调 Envoy 代理接受的端口和协议集。
+-   限制 Envoy 代理可以访问的服务集合。
+
+您可能希望在较庞大的应用程序中限制这样的 sidecar 可达性，配置每个代理能访问网格中的任意服务可能会因为高内存使用量而影响网格的性能。
+
+您可以指定将 sidecar 配置应用于特定命名空间中的所有工作负载，或者使用 `workloadSelector` 选择特定的工作负载。例如，下面的 sidecar 配置将 `bookinfo` 命名空间中的所有服务配置为仅能访问运行在相同命名空间和 Istio 控制平面中的服务（目前需要使用 Istio 的策略和遥测功能）：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: Sidecar
+metadata:
+  name: default
+  namespace: bookinfo
+spec:
+  egress:
+  - hosts:
+    - "./*"
+    - "istio-system/*"
+{{< /text >}}
+
+查阅 [Sidecar 参考](/zh/docs/reference/config/networking/sidecar/)获取详细信息。
+
+## 网络弹性和测试 {#network-resilience-and-testing}
+
+除了为您的网格导流之外，Istio 还提供了可选的故障恢复和故障注入功能，您可以在运行时动态配置这些功能。使用这些特性可以让您的应用程序运行稳定，确保服务网格能够容忍故障节点，并防止局部故障级联影响到其他节点。
+
+### 超时 {#timeouts}
+
+超时是 Envoy 代理等待来自给定服务的答复的时间量，以确保服务不会因为等待答复而无限期的挂起，并在可预测的时间范围内调用成功或失败。HTTP 请求的默认超时时间是 15 秒，这意味着如果服务在 15 秒内没有响应，调用将失败。
+
+对于某些应用程序和服务，Istio 的缺省超时可能不合适。例如，超时太长可能会由于等待失败服务的回复而导致过度的延迟；而超时过短则可能在等待涉及多个服务返回的操作时触发不必要地失败。为了找到并使用最佳超时设置，Istio 允许您使用[虚拟服务](#virtual-services)按服务轻松地动态调整超时，而不必修改您的业务代码。下面的示例是一个虚拟服务，它对 ratings 服务的 v1 子集的调用指定 10 秒超时：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - route:
+    - destination:
+        host: ratings
+        subset: v1
+    timeout: 10s
+{{< /text >}}
+
+### 重试 {#retries}
+
+重试设置指定如果初始调用失败，Envoy 代理尝试连接服务的最大次数。通过确保调用不会因为临时过载的服务或网络等问题而永久失败，重试可以提高服务可用性和应用程序的性能。重试之间的间隔（25ms+）是可变的，并由 Istio 自动确定，从而防止被调用服务被请求淹没。HTTP 请求的默认重试行为是在返回错误之前重试两次。
+
+与超时一样，Istio 默认的重试行为在延迟方面可能不适合您的应用程序需求（对失败的服务进行过多的重试会降低速度）或可用性。您可以在[虚拟服务](#virtual-services)中按服务调整重试设置，而不必修改业务代码。您还可以通过添加每次重试的超时来进一步细化重试行为，并指定每次重试都试图成功连接到服务所等待的时间量。下面的示例配置了在初始调用失败后最多重试 3 次来连接到服务子集，每个重试都有 2 秒的超时。
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - route:
+    - destination:
+        host: ratings
+        subset: v1
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+{{< /text >}}
+
+### 熔断器 {#circuit-breakers}
+
+熔断器是 Istio 为创建具有弹性的微服务应用提供的另一个有用的机制。在熔断器中，设置一个对服务中的单个主机调用的限制，例如并发连接的数量或对该主机调用失败的次数。一旦限制被触发，熔断器就会“跳闸”并停止连接到该主机。使用熔断模式可以快速失败而不必让客户端尝试连接到过载或有故障的主机。
+
+熔断适用于在负载均衡池中的“真实”网格目标地址，您可以在[目标规则](#destination-rules)中配置熔断器阈值，让配置适用于服务中的每个主机。下面的示例将 v1 子集的`reviews`服务工作负载的并发连接数限制为 100：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: reviews
+spec:
+  host: reviews
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+{{< /text >}}
+
+您可以在[熔断](/zh/docs/tasks/traffic-management/circuit-breaking/)中查看更多相关信息。
+
+### 故障注入 {#fault-injection}
+
+在配置了网络，包括故障恢复策略之后，可以使用 Istio 的故障注入机制来为整个应用程序测试故障恢复能力。故障注入是一种将错误引入系统以确保系统能够承受并从错误条件中恢复的测试方法。使用故障注入特别有用，能确保故障恢复策略不至于不兼容或者太严格，这会导致关键服务不可用。
+
+与其他错误注入机制（如延迟数据包或在网络层杀掉 Pod）不同，Istio 允许在应用层注入错误。这使您可以注入更多相关的故障，例如 HTTP 错误码，以获得更多相关的结果。
+
+您可以注入两种故障，它们都使用[虚拟服务](#virtual-services)配置：
+
+- 延迟：延迟是时间故障。它们模拟增加的网络延迟或一个超载的上游服务。
+
+- 终止：终止是崩溃失败。他们模仿上游服务的失败。终止通常以 HTTP 错误码或 TCP 连接失败的形式出现。
+
+例如，下面的虚拟服务为千分之一的访问 `ratings` 服务的请求配置了一个 5 秒的延迟：
+
+{{< text yaml >}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+    route:
+    - destination:
+        host: ratings
+        subset: v1
+{{< /text >}}
+
+有关如何配置延迟和终止的详细信息请参考[故障注入](/zh/docs/tasks/traffic-management/fault-injection/)。
+
+### 和您的应用程序一起运行 {#working-with-your-applications}
+
+Istio 故障恢复功能对应用程序来说是完全透明的。在返回响应之前，应用程序不知道 Envoy sidecar 代理是否正在处理被调用服务的故障。这意味着，如果在应用程序代码中设置了故障恢复策略，那么您需要记住这两个策略都是独立工作的，否则会发生冲突。例如，假设您设置了两个超时，一个在虚拟服务中配置，另一个在应用程序中配置。应用程序为服务的 API 调用设置了 2 秒超时。而您在虚拟服务中配置了一个 3 秒超时和重试。在这种情况下，应用程序的超时会先生效，因此 Envoy 的超时和重试尝试会失效。
+
+虽然 Istio 故障恢复特性提高了网格中服务的可靠性和可用性，但应用程序必须处理故障或错误并采取适当的回退操作。例如，当负载均衡中的所有实例都失败时，Envoy 返回一个`HTTP 503`代码。应用程序必须实现回退逻辑来处理`HTTP 503`错误代码。

@@ -8,6 +8,7 @@ attribution: Vadim Eisenberg
 aliases:
   - /docs/tasks/traffic-management/egress-tcp/
 keywords: [traffic-management,egress,tcp]
+target_release: 1.0
 ---
 
 {{< tip >}}
@@ -20,7 +21,7 @@ In my previous blog post, [Consuming External Web Services](/blog/2018/egress-ht
  over TCP. You will use the [Istio Bookinfo sample application](/docs/examples/bookinfo/), the version in which the book
   ratings data is persisted in a MySQL database. You deploy this database outside the cluster and configure the
   _ratings_ microservice to use it. You define a
- [Service Entry](/docs/reference/config/networking/v1alpha3/service-entry/) to allow the in-mesh applications to
+ [Service Entry](/docs/reference/config/networking/service-entry/) to allow the in-mesh applications to
  access the external database.
 
 ## Bookinfo sample application with external ratings database
@@ -149,7 +150,7 @@ Now you are ready to deploy a version of the Bookinfo application that will use 
 
 ### Initial setting of Bookinfo application
 
-To demonstrate the scenario of using an external database, you start with a Kubernetes cluster with [Istio installed](/docs/setup/install/kubernetes/#installation-steps). Then you deploy the
+To demonstrate the scenario of using an external database, you start with a Kubernetes cluster with [Istio installed](/docs/setup/getting-started/). Then you deploy the
 [Istio Bookinfo sample application](/docs/examples/bookinfo/), [apply the default destination rules](/docs/examples/bookinfo/#apply-default-destination-rules), and [change Istio to the blocking-egress-by-default policy](/docs/tasks/traffic-management/egress/egress-control/#change-to-the-blocking-by-default-policy).
 
 This application uses the `ratings` microservice to fetch
@@ -203,7 +204,7 @@ _reviews_ service always calls the _ratings_ service. In addition, route all the
 service to _ratings v2-mysql_ that uses your database.
 
     Specify the routing for both services above by adding two
-    [virtual services](/docs/reference/config/networking/v1alpha3/virtual-service/). These virtual services are
+    [virtual services](/docs/reference/config/networking/virtual-service/). These virtual services are
     specified in `samples/bookinfo/networking/virtual-service-ratings-mysql.yaml` of an Istio release archive.
     ***Important:*** make sure you
     [applied the default destination rules](/docs/examples/bookinfo/#apply-default-destination-rules) before running the
@@ -335,10 +336,10 @@ entries for TCP cannot be used and
 [the external services must be called directly](/docs/tasks/traffic-management/egress/egress-control/#direct-access-to-external-services),
 bypassing the sidecar proxies.
 
-## Relation to mesh expansion
+## Relation to virtual machines support
 
-Note that the scenario described in this post is different from the mesh expansion scenario, described in the
-[Bookinfo with Mesh Expansion](/docs/examples/mesh-expansion/bookinfo-expanded/) example. In that scenario, a MySQL instance runs on an
+Note that the scenario described in this post is different from the
+[Bookinfo with Virtual Machines](/docs/examples/virtual-machines/) example. In that scenario, a MySQL instance runs on an
 external
 (outside the cluster) machine (a bare metal or a VM), integrated with the Istio service mesh. The MySQL service becomes
 a first-class citizen of the mesh with all the beneficial features of Istio applicable. Among other things, the service
@@ -348,7 +349,7 @@ becomes addressable by a local cluster domain name, for example by `mysqldb.vm.s
 entry to access this service; however, the service must be registered with Istio. To enable such integration, Istio
 components (_Envoy proxy_, _node-agent_, `_istio-agent_`) must be installed on the machine and the Istio control plane
 (_Pilot_, _Mixer_, _Citadel_) must be accessible from it. See the
-[Istio Mesh Expansion](/docs/examples/mesh-expansion/) instructions for more details.
+[Istio VM-related](/docs/examples/virtual-machines/) tasks for more details.
 
 In our case, the MySQL instance can run on any machine or can be provisioned as a service by a cloud provider. There is
 no requirement to integrate the machine with Istio. The Istio control plane does not have to be accessible from the

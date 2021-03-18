@@ -24,7 +24,7 @@ let syntaxColoring = true;
 // All the voodoo needed to support our fancy code blocks
 function handleCodeBlocks() {
     const toolbarShow = "toolbar-show";
-    const syntaxColoringCookie = "syntax-coloring";
+    const syntaxColoringStorageItem = "syntax-coloring";
     const syntaxColoringItem = "syntax-coloring-item";
 
     // Add a toolbar to all PRE blocks
@@ -47,79 +47,6 @@ function handleCodeBlocks() {
             return true;
         });
 
-        const downloadButton = document.createElement(button);
-        downloadButton.title = buttonDownload;
-        downloadButton.className = "download";
-        downloadButton.innerHTML = "<svg><use xlink:href='" + iconFile + "#download'/></svg>";
-        downloadButton.setAttribute(ariaLabel, buttonDownload);
-        listen(downloadButton, mouseenter, e => (e.currentTarget as HTMLElement).classList.add(toolbarShow));
-        listen(downloadButton, mouseleave, e => (e.currentTarget as HTMLElement).classList.remove(toolbarShow));
-        listen(downloadButton, "focus", e => (e.currentTarget as HTMLElement).classList.add(toolbarShow));
-        listen(downloadButton, "blur", e => (e.currentTarget as HTMLElement).classList.remove(toolbarShow));
-
-        listen(downloadButton, click, e => {
-            const div = (e.currentTarget as HTMLElement).parentElement;
-            if (!div) {
-                return false;
-            }
-
-            const codes = div.getElementsByTagName("code");
-            if ((codes !== null) && (codes.length > 0)) {
-                const code = codes[0];
-                if (!code) {
-                    return false;
-                }
-
-                const text = getToolbarDivText(div);
-                let downloadas = code.dataset.downloadas;
-                if (!downloadas || downloadas === "") {
-                    let lang = "";
-                    for (const cl of code.classList) {
-                        if (!cl) {
-                            continue;
-                        }
-
-                        if (cl.startsWith("language-")) {
-                            lang = cl.substr(9);
-                            break;
-                        } else if (cl.startsWith("command-")) {
-                            lang = "bash";
-                            break;
-                        }
-                    }
-
-                    if (lang === "markdown") {
-                        lang = "md";
-                    } else if (lang === "") {
-                        lang = "txt";
-                    }
-
-                    downloadas = docTitle + "." + lang;
-                }
-                saveFile(downloadas, text);
-            }
-            return true;
-        });
-
-        const printButton = document.createElement(button);
-        printButton.title = buttonPrint;
-        printButton.className = "print";
-        printButton.innerHTML = "<svg><use xlink:href='" + iconFile + "#printer'/></svg>";
-        printButton.setAttribute(ariaLabel, buttonPrint);
-        listen(printButton, mouseenter, e => (e.currentTarget as HTMLElement).classList.add(toolbarShow));
-        listen(printButton, mouseleave, e => (e.currentTarget as HTMLElement).classList.remove(toolbarShow));
-        listen(printButton, "focus", e => (e.currentTarget as HTMLElement).classList.add(toolbarShow));
-        listen(printButton, "blur", e => (e.currentTarget as HTMLElement).classList.remove(toolbarShow));
-
-        listen(printButton, click, e => {
-            const div = (e.currentTarget as HTMLElement).parentElement;
-            if (div) {
-                const text = getToolbarDivText(div);
-                printText(text);
-            }
-            return true;
-        });
-
         // wrap the PRE block in a DIV so we have a place to attach the toolbar buttons
         const div = document.createElement("div");
         div.className = "toolbar";
@@ -129,8 +56,6 @@ function handleCodeBlocks() {
             parent.insertBefore(div, pre);
         }
         div.appendChild(pre);
-        div.appendChild(printButton);
-        div.appendChild(downloadButton);
         div.appendChild(copyButton);
 
         listen(pre, mouseenter, o => {
@@ -207,10 +132,12 @@ function handleCodeBlocks() {
         if (cl !== "") {
             let firstLineOfOutput = 0;
             const lines = code.innerText.split("\n");
+            const heredoc = RegExp(/<<\s*\\?EOF/);
             let cmd = "";
             let escape = false;
             let escapeUntilEOF = false;
             let tmp = "";
+
             for (let j = 0; j < lines.length; j++) {
                 const line = lines[j];
 
@@ -225,14 +152,14 @@ function handleCodeBlocks() {
 
                     tmp = line.slice(2);
 
-                    if (line.includes("<<EOF")) {
+                    if (heredoc.test(line)) {
                         escapeUntilEOF = true;
                     }
                 } else if (escape) {
                     // continuation
                     tmp += "\n" + line;
 
-                    if (line.includes("<<EOF")) {
+                    if (heredoc.test(line)) {
                         escapeUntilEOF = true;
                     }
                 } else if (escapeUntilEOF) {
@@ -343,14 +270,14 @@ function handleCodeBlocks() {
     }
 
     function handleSyntaxColoringOption(): void {
-        const cookieValue = readCookie(syntaxColoringCookie);
-        if (cookieValue === "true") {
+        const setting = readLocalStorage(syntaxColoringStorageItem);
+        if (setting === "true") {
             syntaxColoring = true;
-        } else if (cookieValue === "false") {
+        } else if (setting === "false") {
             syntaxColoring = false;
         }
 
-        const item = document.getElementById(syntaxColoringItem);
+        const item = getById(syntaxColoringItem);
         if (item) {
             if (syntaxColoring) {
                 item.classList.add(active);
@@ -360,7 +287,7 @@ function handleCodeBlocks() {
         }
 
         listen(getById(syntaxColoringItem), click, () => {
-            createCookie(syntaxColoringCookie, syntaxColoring ? "false" : "true");
+            localStorage.setItem(syntaxColoringStorageItem, syntaxColoring ? "false" : "true");
             location.reload();
         });
     }

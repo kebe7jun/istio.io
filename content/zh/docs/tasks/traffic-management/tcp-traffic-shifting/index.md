@@ -1,57 +1,70 @@
 ---
 title: TCP 流量转移
-description: 展示如何将一个 TCP 服务的流量从老版本迁移到新版本。
-weight: 26
+description: 展示如何将一个服务的 TCP 流量从旧版本迁移到新版本。
+weight: 31
 keywords: [traffic-management,tcp-traffic-shifting]
+aliases:
+    - /zh/docs/tasks/traffic-management/tcp-version-migration.html
 ---
 
-本任务展示了如何优雅的将微服务中的 TCP 流量从一个版本迁移到另一个版本。例如将 TCP 流量从旧版本迁移到一个新版本。这是一个常见的场景。在 Istio 中可以通过定义一组规则，将 TCP 流量在不同服务之间进行分配。在这一任务中，首先把 100% 的 TCP 流量发送到 `tcp-echo:v1`；下一步就是使用 Istio 的路由分配能力，把 20% 的流量分配到 `tcp-echo:v2` 服务之中。
+本任务展示了如何逐步将 TCP 流量从微服务的一个版本迁移到另一个版本。例如，将 TCP 流量从旧版本迁移到新版本。
 
-## 开始之前 {#before-you-begin}
+在 Istio 中，您可以通过配置一系列规则来实现此目标，这些规则按指定的百分比将流量路由到不同的服务。在此任务
+中，将先把 100% 的 TCP 流量分配到 `tcp-echo:v1`，然后，再通过配置 Istio 路由权重把 20% 的 TCP 流量分
+配到 `tcp-echo:v2`。
+
+## 开始之前{#before-you-begin}
 
 * 按照[安装指南](/zh/docs/setup/)中的说明安装 Istio。
 
-* 熟悉[流量管理](/zh/docs/concepts/traffic-management)中的相关概念。
+* 回顾[流量管理](/zh/docs/concepts/traffic-management)概念文档。
 
-## 应用基于权重的 TCP 路由 {#apply-weight-based-tcp-routing}
+## 应用基于权重的 TCP 路由{#apply-weight-based-tcp-routing}
 
-1. 第一个步骤是部署 `tcp-echo` 微服务的 `v1` 版本。
+1. 首先，部署微服务 `tcp-echo` 的 `v1` 版本。
 
-    * 如果使用的是[手工 Sidecar 注入](/zh/docs/setup/kubernetes/additional-setup/sidecar-injection/#手工注入-sidecar)，使用如下命令：
-
-        {{< text bash >}}
-        $ kubectl apply -f <(istioctl kube-inject -f @samples/tcp-echo/tcp-echo-services.yaml@)
-        {{< /text >}}
-
-    `istioctl kube-inject` 的作用如[文档](/zh/docs/reference/commands/istioctl/#istioctl-kube-inject)所言，是在提交 `tcp-echo-services.yaml` 之前进行修改。
-
-    * 如果使用的是一个启用了 [Sidecar 自动注入](/zh/docs/setup/kubernetes/additional-setup/sidecar-injection/#sidecar-的自动注入)的集群，可以给 `default` 命名空间打上 `istio-injection=enabled` 标签：
+    * 第一步，为测试 TCP 流量转移创建命名空间
 
         {{< text bash >}}
-        $ kubectl label namespace default istio-injection=enabled
+        $ kubectl create namespace istio-io-tcp-traffic-shifting
         {{< /text >}}
 
-        然后简单的使用 `kubectl` 进行服务部署即可：
+    * 如果使用[手动注入 sidecar](/zh/docs/setup/additional-setup/sidecar-injection/#manual-sidecar-injection)，请使用下面命令：
 
         {{< text bash >}}
-        $ kubectl apply -f @samples/tcp-echo/tcp-echo-services.yaml@
+        $ kubectl apply -f <(istioctl kube-inject -f @samples/tcp-echo/tcp-echo-services.yaml@) -n istio-io-tcp-traffic-shifting
         {{< /text >}}
 
-1. 下一步，把所有目标是 `tcp-echo` 微服务的 TCP 流量路由到 `v1` 版本：
+        [`istioctl kube-inject`](/zh/docs/reference/commands/istioctl/#istioctl-kube-inject) 命令用于在创建 deployments 之前
+        修改 `tcp-echo-services.yaml` 文件。
+
+    * 如果您使用的是启用了[自动注入 sidecar](/zh/docs/setup/additional-setup/sidecar-injection/#automatic-sidecar-injection) 的集群，可以将 `istio-io-tcp-traffic-shifting` namespace 标记为 `istio-injection=enabled` 。
+
+        {{< text bash >}}
+        $ kubectl label namespace istio-io-tcp-traffic-shifting istio-injection=enabled
+        {{< /text >}}
+
+        然后，只需使用 `kubectl` 部署服务即可。
+
+        {{< text bash >}}
+        $ kubectl apply -f @samples/tcp-echo/tcp-echo-services.yaml@ -n istio-io-tcp-traffic-shifting
+        {{< /text >}}
+
+1. 接下来, 将目标为微服务 `tcp-echo` 的 TCP 流量全部路由到 `v1` 版本。
 
     {{< text bash >}}
-    $ kubectl apply -f @samples/tcp-echo/tcp-echo-all-v1.yaml@
+    $ kubectl apply -f @samples/tcp-echo/tcp-echo-all-v1.yaml@ -n istio-io-tcp-traffic-shifting
     {{< /text >}}
 
-1. 确认 `tcp-echo` 服务已经启动并开始运行。
+1. 确认 `tcp-echo` 服务已启动并开始运行。
 
-    下面的 `$INGRESS_HOST` 变量中保存了 Ingress 的外部 IP 地址（[Bookinfo](/zh/docs/examples/bookinfo/#确定-ingress-的-ip-和端口) 文档中描写了这一部分的相关内容）。可以使用下面的命令来获取 `$INGRESS_PORT` 的值：
+    下面的 `$INGRESS_HOST` 变量是 ingress 的外部 IP 地址，可参考 [Ingress Gateways](/zh/docs/tasks/traffic-management/ingress/ingress-control/#determining-the-ingress-i-p-and-ports) 文档。要获取 `$INGRESS_PORT` 变量的值，请使用以下命令。
 
     {{< text bash >}}
     $ export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="tcp")].port}')
     {{< /text >}}
 
-    向 `tcp-echo` 微服务发送一些 TCP 流量：
+    向微服务 `tcp-echo` 发送一些 TCP 流量。
 
     {{< text bash >}}
     $ for i in {1..10}; do \
@@ -69,20 +82,24 @@ keywords: [traffic-management,tcp-traffic-shifting]
     one Mon Nov 12 23:25:19 UTC 2018
     {{< /text >}}
 
-    不难发现，所有的时间戳都有一个 `one` 前缀，这代表所有访问 `tcp-echo` 服务的流量都被路由到了 `v1` 版本。
+    {{< warning >}}
+    可能需要通过 `sudo` 执行 `docker` 命令，这取决于您的 Docker 安装。
+    {{< /warning >}}
 
-1. 用下面的命令把 20% 的流量从 `tcp-echo:v1` 转移到 `tcp-echo:v2`：
+    您应该注意到，所有时间戳的前缀都是 _one_ ，这意味着所有流量都被路由到了 `tcp-echo` 服务的 `v1` 版本。
+
+1. 使用以下命令将 20% 的流量从 `tcp-echo:v1` 转移到 `tcp-echo:v2`：
 
     {{< text bash >}}
-    $ kubectl apply -f @samples/tcp-echo/tcp-echo-20-v2.yaml@
+    $ kubectl apply -f @samples/tcp-echo/tcp-echo-20-v2.yaml@ -n istio-io-tcp-traffic-shifting
     {{< /text >}}
 
-    需要一定时间完成新规则的传播和生效。
+    等待几秒钟，以使新规则在集群中传播和生效。
 
-1. 确认该规则已经完成替换：
+1. 确认规则配置已替换完成：
 
     {{< text bash yaml >}}
-    $ kubectl get virtualservice tcp-echo -o yaml
+    $ kubectl get virtualservice tcp-echo -o yaml -n istio-io-tcp-traffic-shifting
     apiVersion: networking.istio.io/v1alpha3
     kind: VirtualService
     metadata:
@@ -108,7 +125,7 @@ keywords: [traffic-management,tcp-traffic-shifting]
           weight: 20
     {{< /text >}}
 
-1. 向 `tcp-echo` 微服务发送更多 TCP 流量：
+1. 向 `tcp-echo` 服务发送更多 TCP 流量。
 
     {{< text bash >}}
     $ for i in {1..10}; do \
@@ -126,19 +143,28 @@ keywords: [traffic-management,tcp-traffic-shifting]
     one Mon Nov 12 23:39:07 UTC 2018
     {{< /text >}}
 
-    现在应该会看到，输出内容中有 20% 的时间戳前缀为 `two`，这意味着 80% 的流量被路由到 `tcp-echo:v1`，其余 20% 流量被路由到了 `v2`。
+    {{< warning >}}
+    可能需要通过 `sudo` 执行 `docker` 命令，这取决于您的 Docker 安装。
+    {{< /warning >}}
 
-## 理解原理 {#trace-context-propagation}
+    现在应该发现，有大约 20% 的流量时间戳前缀是 _two_ ，这意味着有 80% 的 TCP 流量路由到了 `tcp-echo` 服务的
+     `v1` 版本，与此同时有 20% 流量路由到了 `v2` 版本。
 
-这个任务里，用 Istio 的权重路由功能，把一部分访问 `tcp-echo` 服务的 TCP 流量被从旧版本迁移到了新版本。容器编排平台中的版本迁移使用的是对特定组别的实例进行伸缩来完成对流量的控制的，两种迁移方式显然大相径庭。
+## 理解原理{#understanding-what-happened}
 
-在 Istio 中可以对两个版本的 `tcp-echo` 服务进行独立的扩缩容，伸缩过程中不会对流量的分配结果造成影响，可以阅读博客：[使用 Istio 进行金丝雀部署](/zh/blog/2017/0.1-canary/)，进一步了解相关内容。
+这个任务中，使用 Istio 路由权重特性将 `tcp-echo` 服务的 TCP 流量从旧版本迁移到了新版本。请注意，这与使用容
+器编排平台的 deployment 进行版本迁移非常不同，后者（容器编排平台）是通过对特定组别的实例进行伸缩实现的。
 
-## 清理 {#clean-up}
+在 Istio 中可以对 `tcp-echo` 服务的两个版本进行独立扩容和缩容，这个过程不会影响服务版本之间的流量分配。
 
-1. 删除 `tcp-echo` 应用和路由规则：
+有关不同版本间流量管理及自动伸缩的更多信息，请查看博客文章[使用 Istio 进行金丝雀部署](/zh/blog/2017/0.1-canary/)。
+
+## 清理{#cleanup}
+
+1. 删除 `tcp-echo` 应用程序和路由规则。
 
     {{< text bash >}}
-    $ kubectl delete -f @samples/tcp-echo/tcp-echo-all-v1.yaml@
-    $ kubectl delete -f @samples/tcp-echo/tcp-echo-services.yaml@
+    $ kubectl delete -f @samples/tcp-echo/tcp-echo-all-v1.yaml@ -n istio-io-tcp-traffic-shifting
+    $ kubectl delete -f @samples/tcp-echo/tcp-echo-services.yaml@ -n istio-io-tcp-traffic-shifting
+    $ kubectl delete namespace istio-io-tcp-traffic-shifting
     {{< /text >}}

@@ -1,5 +1,6 @@
 ---
 title: Configuration
 description: Detailed information on configuration options.
-weight: 20
+weight: 10
+test: n/a
 ---

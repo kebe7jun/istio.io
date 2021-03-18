@@ -1,11 +1,11 @@
 ---
 title: Trust Domain
+test: n/a
 ---
 
-A trust domain is a unique name that Istio uses to create all
-[identities](/docs/reference/glossary/#identity) within a mesh. Every mesh has
-an exclusive trust domain.
+[Trust domain](https://spiffe.io/spiffe/concepts/#trust-domain) corresponds to the trust root of a system and is part of a workload identity.
 
-For example in `spiffe://mytrustdomain.com/ns/default/sa/myname` the substring
-identifying the mesh is: `mytrustdomain.com`. This substring is the trust
-domain of the mesh.
+Istio uses a trust domain to create all [identities](/docs/reference/glossary/#identity) within a mesh.
+For example in `spiffe://mytrustdomain.com/ns/default/sa/myname` the substring `mytrustdomain.com` specifies that the workload is from a trust domain called `mytrustdomain.com`.
+
+You can have one or more trust domains in a multicluster mesh, as long as the clusters share the same root of trust.

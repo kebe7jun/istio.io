@@ -83,7 +83,9 @@
         <!-- End Google Analytics -->
 
         <!-- RSS -->
-        <link rel="alternate" type="application/rss+xml" title="Istio Blog" href="/feed.xml">
+        <link rel="alternate" type="application/rss+xml" title="Istio Blog" href="/blog/feed.xml">
+        <link rel="alternate" type="application/rss+xml" title="Istio News" href="/news/feed.xml">
+        <link rel="alternate" type="application/rss+xml" title="Istio Blog and News" href="/feed.xml">
 
         <!-- Favicons: generated from img/istio-whitelogo-bluebackground-framed.svg by http://cthedot.de/icongen -->
         <link rel="shortcut icon" href="/favicons/favicon.ico" >
@@ -134,7 +136,10 @@
         <!-- our own stuff -->
         <script src="/js/all.min.js" data-manual defer></script>
 
+        {{ partial "events.html" (dict "page" . "kind" "sticker") }}
         {{ partial "header.html" . }}
+        {{ partial "events.html" (dict "page" . "kind" "banner") }}
+
         {{ block "main" . }}{{ end }}
         {{ partial "footer.html" . }}
 
@@ -150,14 +155,12 @@
         </div>
 
         {{ if .Site.Data.args.preliminary }}
-            <!--
             <div id="switch-lang-container" aria-hidden="true">
                 {{ $home := .Site.GetPage "home" }}
                 <a id="switch-lang" data-skipendnotes="true" title='{{ i18n "switch_lang"}}'>
                     {{ partial "icon.html" "switch-lang" }}
                 </a>
-            </>div>
-            -->
+            </div>
 
             {{ if .Page.Params.source_repo }}
                 <div id="edit-this-page-container" aria-hidden="true">
@@ -170,7 +173,7 @@
                 </div>
             {{ else }}
                 <div id="edit-this-page-container" aria-hidden="true">
-                    <a tabindex="-1" id="edit-this-page" data-skipendnotes="true" href="https://github.com/istio/istio.io/edit/{{ .Site.Data.args.doc_branch_name }}/content/en/{{ .Path }}" title='{{ i18n "edit_on_github"}}'>
+                    <a tabindex="-1" id="edit-this-page" data-skipendnotes="true" href="https://github.com/istio/istio.io/edit/{{ .Site.Data.args.doc_branch_name }}/content/{{ .Lang }}/{{ .Path }}" title='{{ i18n "edit_on_github"}}'>
                         {{ partial "icon.html" "pencil" }}
                     </a>
                 </div>

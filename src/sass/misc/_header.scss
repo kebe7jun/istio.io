@@ -138,6 +138,16 @@ header {
         height: 1.1em;
     }
 
+    svg.magnifier {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
+    svg.cancel-x {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
     #hamburger {
         display: inline-block;
         position: absolute;
@@ -181,11 +191,9 @@ header {
             transition: right .5s;
         }
 
-        span {
+        .current {
             border-bottom: solid 3px $textBrandColor;
             border-radius: 2px;
-            color: $textBrandColor;
-            cursor: default;
             font-weight: $linkWeight;
             font-family: "Chivo", sans-serif;
             font-size: 1.1em;
@@ -197,6 +205,11 @@ header {
                 margin-left: .58rem;
                 margin-right: .58rem;
             }
+        }
+
+        span.current {
+            cursor: default;
+            color: $textBrandColor;
         }
     }
 

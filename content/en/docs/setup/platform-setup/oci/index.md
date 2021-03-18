@@ -1,13 +1,19 @@
 ---
 title: Oracle Cloud Infrastructure
 description: Instructions to setup an OKE cluster for Istio.
-weight: 27
+weight: 60
 skip_seealso: true
 aliases:
     - /docs/setup/kubernetes/prepare/platform-setup/oci/
     - /docs/setup/kubernetes/platform-setup/oci/
 keywords: [platform-setup,kubernetes,oke,oci,oracle]
+owner: istio/wg-environments-maintainers
+test: no
 ---
+
+This page was last updated January 4, 2019.
+
+{{< boilerplate untested-document >}}
 
 Follow these instructions to prepare an OKE cluster for Istio.
 

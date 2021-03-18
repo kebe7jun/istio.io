@@ -1,6 +1,13 @@
 ---
-title: 安装和升级
-description: 在不同的环境下（例如 Kubernetes、Consul 等）如何部署和升级 Istio。
+title: 安装
+description: 关于如何在 Kubernetes 集群中安装 Istio 控制平面和添加虚拟机到 mesh 中的说明。
 weight: 15
 icon: setup
+aliases:
+    - /zh/docs/tasks/installing-istio.html
+    - /zh/docs/setup/install-kubernetes.html
+    - /zh/docs/setup/kubernetes/quick-start.html
+    - /zh/docs/setup/kubernetes/download-release/
+    - /zh/docs/setup/kubernetes/download/
+keywords: [kubernetes,install,quick-start,setup,installation]
 ---

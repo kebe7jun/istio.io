@@ -1,9 +1,12 @@
 ---
-title: 工作负载
+title: Workload
 ---
-工作负载是通过操作部署的二进制文件，用于在 Istio 里提供某种功能。工作负载有名字，命名空间和唯一的 id。工作负载的属性可以通过下面这些[属性](#%E5%B1%9E%E6%80%A7)在策略和遥测配置功能里获取：
+[operators](/zh/docs/reference/glossary/#operator) 部署的二进制文件，用于提供服务网格应用的一些功能。
+工作负载有自己的名称，命名空间，和唯一的 id。
+这些属性可以通过下面的[属性](/zh/docs/reference/glossary/#attribute)被策略配置和遥测配置使用：
 
 * `source.workload.name`, `source.workload.namespace`, `source.workload.uid`
 * `destination.workload.name`, `destination.workload.namespace`, `destination.workload.uid`
 
-在 Kubernetes里，一个工作负载通常对应一个 Kubernetes 的 deployment，然后一个工作负载的实例对应一个 deployment 管理的其中一个 pod。
+在 Kubernetes 环境中，一个工作负载通常对应一个 Kubernetes deployment，
+并且一个[工作负载实例](/zh/docs/reference/glossary/#workload-instance)对应一个独立的被 deployment 管理的 [pod](/zh/docs/reference/glossary/#pod)。

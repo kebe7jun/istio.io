@@ -8,9 +8,10 @@ keywords: [adapters,mixer,policies,telemetry,availability,latency]
 aliases:
     - /blog/posts/2017/mixer-spof-myth.html
     - /blog/mixer-spof-myth.html
+target_release: 0.3
 ---
 
-As [Mixer](/docs/reference/config/policy-and-telemetry/) is in the request path, it is natural to question how it impacts
+As [Mixer](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/) is in the request path, it is natural to question how it impacts
 overall system availability and latency. A common refrain we hear when people first glance at Istio architecture diagrams is
 "Isn't this just introducing a single point of failure?"
 

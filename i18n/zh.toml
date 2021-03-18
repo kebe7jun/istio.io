@@ -97,15 +97,6 @@ other = "%d 字"
 [page_reading_time]
 other = "阅读大约需要 %v 分钟"
 
-[relnote_download]
-other = "%s 下载"
-
-[relnote_changes]
-other = "%s 变更"
-
-[relnote_docs]
-other = "%s 文档"
-
 [relnote_update_advice]
 other = "在下载 ％s 之前，您应该知道有一个更新的补丁版本，这个版本修复了已知的 Bug 并且在一定程度上提升了性能。"
 
@@ -114,6 +105,42 @@ other = "了解 Istio %s"
 
 [relnote_update_notice]
 other = "更新提示"
+
+[relnote_change_notes_title]
+other = "更新记录"
+
+[relnote_change_notes_detail]
+other = "获取变更详细列表。"
+
+[relnote_before_you_upgrade_title]
+other = "升级之前"
+
+[relnote_before_you_upgrade_detail]
+other = "升级前须知。"
+
+[relnote_download_title]
+other = "下载"
+
+[relnote_download_detail]
+other = "下载安装该发行版。"
+
+[relnote_docs_title]
+other = "文档"
+
+[relnote_docs_detail]
+other = " 访问该发行版的文档。"
+
+[relnote_helm_changes_title]
+other = "Helm 变更"
+
+[relnote_helm_changes_detail]
+other = "了解 Helm 安装选项中的变更。"
+
+[relnote_source_changes_title]
+other = "代码变更"
+
+[relnote_source_changes_detail]
+other = "查看源码变更的详细信息。"
 
 [page_attribution]
 other = "作者 "
@@ -193,5 +220,71 @@ other = "中文内容由 ServiceMesher 社区维护，部分文档可能稍微�
 [syntax_coloring]
 other = "代码高亮"
 
-[announcement_relnotes]
-other = "%s 发布说明"
+[analysis_name]
+other = "消息名称"
+
+[analysis_code]
+other = "消息代码"
+
+[analysis_description]
+other = "描述"
+
+[analysis_level]
+other = "等级"
+
+[target_release]
+other = "该博客文章是在 Istio %v 的版本下编写的，因此其中某些内容现在可能已过时。"
+
+[security_disclosure]
+other = "安全漏洞"
+
+[security_related]
+other = "关联"
+
+[security_date]
+other = "日期"
+
+[security_affected_releases]
+other = "受影响的版本"
+
+[security_impact_score]
+other = "影响评分"
+
+[mark_all_as_read]
+other = "全部标位已读"
+
+[security_bulletin_title]
+other = "安全漏洞详情"
+
+[security_bulletin_cves]
+other = "CVE(s)"
+
+[security_bulletin_cvss]
+other = "CVSS 影响评分"
+
+[security_bulletin_affected_releases]
+other = "受影响的版本"
+
+[feedback_title]
+other = "这些信息有用吗？"
+
+[feedback_yes]
+other = "是的"
+
+[feedback_no]
+other = "没有"
+
+[log_month_format]
+other = "2006-01"
+
+[log_change_format]
+other = "2006/01/02"
+
+[log_when]
+other = "日期"
+
+[log_doc]
+other = "文档"
+
+[log_change]
+other = "更改"

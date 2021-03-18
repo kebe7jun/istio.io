@@ -1,319 +1,309 @@
 ---
-title: Operator CLI-based Installation [Experimental]
-description: Install and configure Istio using the Istio Operator CLI.
+title: Istio Operator Install
+description: Instructions to install Istio in a Kubernetes cluster using the Istio operator.
 weight: 25
-keywords: [operator,kubernetes,helm]
+keywords: [kubernetes, operator]
+aliases:
+    - /docs/setup/install/standalone-operator
+owner: istio/wg-environments-maintainers
+test: no
 ---
 
-{{< boilerplate experimental-feature-warning >}}
+Instead of manually installing, upgrading, and uninstalling Istio in a production environment,
+you can instead let the Istio [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+manage the installation for you.
+This relieves you of the burden of managing different `istioctl` versions.
+Simply update the operator {{<gloss CRDs>}}custom resource (CR){{</gloss>}} and the
+operator controller will apply the corresponding configuration changes for you.
 
-Follow this guide to install and configure an Istio mesh using an alternate
-installation method: the Istio {{<gloss operator>}}Operator CLI{{</gloss>}}
-installation.
+The same [`IstioOperator` API](/docs/reference/config/istio.operator.v1alpha1/) is used
+to install Istio with the operator as when using the [istioctl install instructions](/docs/setup/install/istioctl).
+In both cases, configuration is validated against a schema and the same correctness
+checks are performed.
 
-The Istio Operator CLI offers a new installation method with the option of
-installing Istio using a one-line command. It has user input
-validation to help prevent installation errors and customization options to
-override any aspect of the configuration.
-
-The Operator install is accessed via [`istioctl`](/docs/reference/commands/istioctl/)
-commands.
+{{< warning >}}
+Using an operator does have a security implication.
+With the `istioctl install` command, the operation will run in the admin user’s security context,
+whereas with an operator, an in-cluster pod will run the operation in its security context.
+To avoid a vulnerability, ensure that the operator deployment is sufficiently secured.
+{{< /warning >}}
 
 ## Prerequisites
 
-Before you begin, check the following prerequisites:
-
-1. [Download the Istio release](/docs/setup/#downloading-the-release).
 1. Perform any necessary [platform-specific setup](/docs/setup/platform-setup/).
-1. Check the [Requirements for Pods and Services](/docs/setup/additional-setup/requirements/).
 
-## Install Istio using the default profile
+1. Check the [Requirements for Pods and Services](/docs/ops/deployment/requirements/).
 
-The simplest option is to install a default Istio configuration using a one-line command:
+1. Install the [{{< istioctl >}} command](/docs/ops/diagnostic-tools/istioctl/).
 
-{{< text bash >}}
-$ istioctl experimental manifest apply
-{{< /text >}}
+1. Deploy the Istio operator:
 
-This command installs a profile named `default` on the cluster defined by your
-Kubernetes configuration. The `default` profile is smaller and more suitable
-for establishing a production environment, unlike the larger `demo` profile that
-is intended for evaluating a broad set of Istio features.
+    {{< text bash >}}
+    $ istioctl operator init
+    {{< /text >}}
 
-You can view the `default` profile configuration settings by using this command:
+    This command runs the operator by creating the following resources in the `istio-operator` namespace:
 
-{{< text bash >}}
-$ istioctl experimental profile dump
-{{< /text >}}
+    - The operator custom resource definition
+    - The operator controller deployment
+    - A service to access operator metrics
+    - Necessary Istio operator RBAC rules
 
-To view a subset of the entire configuration, you can use the `--config-path` flag, which selects only the portion
-of the configuration under the given path:
+    You can configure which namespace the operator controller is installed in, the namespace(s) the operator watches, the installed Istio image sources and versions, and more. For example, you can pass one or more namespaces to watch using the `--watchedNamespaces` flag:
 
-{{< text bash >}}
-$ istioctl experimental profile dump --config-path trafficManagement.components.pilot
-{{< /text >}}
+    {{< text bash >}}
+    $ istioctl operator init --watchedNamespaces=istio-namespace1,istio-namespace2
+    {{< /text >}}
 
-## Install a different profile
+    See the [`istioctl operator init` command reference](/docs/reference/commands/istioctl/#istioctl-operator-init) for details.
 
-Other Istio configuration profiles can be installed in a cluster using this command:
+    {{< tip >}}
+    You can alternatively deploy the operator using Helm:
 
-{{< text bash >}}
-$ istioctl experimental manifest apply --set profile=demo
-{{< /text >}}
+    {{< text bash >}}
+    $ helm install istio-operator manifests/charts/istio-operator \
+      --set operatorNamespace=istio-operator \
+      --set watchedNamespaces="istio-namespace1\,istio-namespace2"
+    {{< /text >}}
 
-In the example above, `demo` is one of the profile names from the output of
-the [`istioctl experimental profile list`](/docs/reference/commands/istioctl/#istioctl-experimental-profile-list) command.
+    {{< boilerplate helm-hub-tag >}}
 
-## Display the profile list
+    Note that you need to [download the Istio release](/docs/setup/getting-started/#download)
+    to run the above command.
+    {{< /tip >}}
 
-You can display the names of Istio configuration profiles that are
-accessible to `istioctl` by using this command:
+## Install
 
-{{< text bash >}}
-$ istioctl experimental profile list
-{{< /text >}}
-
-## Customize Istio settings using the `IstioControlPlane` API
-
-You can change a feature or component setting by using the [`IstioControlPlane` API](/docs/reference/config/istio.operator.v1alpha12.pb/)
-([proto](https://github.com/istio/operator/blob/release-1.3/pkg/apis/istio/v1alpha2/istiocontrolplane_types.proto)).
-
-### Identify the feature or component
-
-The API groups Istio control plane components by feature, as shown in the table below:
-
-| Feature | Components |
-|---------|------------|
-`Base` | CRDs
-`Traffic Management` | Pilot
-`Policy` | Policy
-`Telemetry` | Telemetry
-`Security` | Citadel
-`Security` | Node agent
-`Security` | Cert manager
-`Configuration management` | Galley
-`Gateways` | Ingress gateway
-`Gateways` | Egress gateway
-`AutoInjection` | Sidecar injector
-
-In addition to the core Istio components, third-party addon features and components are also available:
-
-| Feature | Components |
-|---------|------------|
-`Telemetry` | Prometheus
-`Telemetry` | Prometheus Operator
-`Telemetry` | Grafana
-`Telemetry` | Kiali
-`Telemetry` | Tracing
-`ThirdParty` | CNI
-
-Features can be enabled or disabled, which enables or disables all of the components that are a part of the feature.
-Namespaces that components are installed into can be set by component, feature, or globally.
-
-### Configure the feature or component settings
-
-After you identify the name of the feature or component from the previous table, you can use the API to set the values
-using the `--set` flag, or create an overlay file and use the `--filename` flag. The `--set` flag
-works well for customizing a few parameters. Overlay files are designed for more extensive customization, or
-tracking configuration changes.
-
-The simplest customization is to turn a feature or component on or off from the configuration profile default.
-
-To disable the telemetry feature in a default configuration profile, use this command:
+To install the Istio `demo` [configuration profile](/docs/setup/additional-setup/config-profiles/)
+using the operator, run the following command:
 
 {{< text bash >}}
-$ istioctl experimental manifest apply --set telemetry.enabled=false
+$ kubectl apply -f - <<EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane
+spec:
+  profile: demo
+EOF
 {{< /text >}}
 
-Alternatively, you can disable the telemetry feature using a configuration overlay file:
+The controller will detect the `IstioOperator` resource and then install the Istio
+components corresponding to the specified (`demo`) configuration.
 
-1. Create this file with the name `telemetry_off.yaml` and these contents:
+{{< warning >}}
+If you used `--watchedNamespaces` when you initialized the Istio operator, apply the `IstioOperator` resource in one of the watched namespaces, instead of in `istio-system`.
+{{< /warning >}}
+
+The Istio control plane (istiod) will be installed in the `istio-system` namespace by default. To install it in a different location, specify the namespace using the `values.global.istioNamespace` field as follows:
 
 {{< text yaml >}}
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+...
 spec:
-  telemetry:
-    enabled: false
-{{< /text >}}
-
-1. Use the `telemetry_off.yaml` overlay file with the `manifest apply` command:
-
-{{< text bash >}}
-$ istioctl experimental manifest apply -f telemetry_off.yaml
-{{< /text >}}
-
-You can also use this approach to set the component-level configuration, such as enabling the node agent:
-
-{{< text bash >}}
-$ istioctl experimental manifest apply --set security.components.nodeAgent.enabled=true
-{{< /text >}}
-
-Another customization is to select different namespaces for features and components. The following is an example
-of installation namespace customization:
-
-{{< text yaml >}}
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
-spec:
-  defaultNamespace: istio-system
-  security:
-    namespace: istio-security
-    components:
-      citadel:
-        namespace: istio-citadel
-{{< /text >}}
-
-Applying this file will cause the default profile to be applied, with components being installed into the following
-namespaces:
-
-- The Citadel component is installed into `istio-citadel` namespace
-- All other components in the security feature installed into `istio-security` namespace
-- Remaining Istio components installed into istio-system namespace
-
-## Customize Kubernetes settings using the `IstioControlPlane` API
-
-The `IstioControlPlane` API allows each component's Kubernetes settings to be customized in a consistent way.
-
-### Identify the feature or component settings
-
-Each component has a [`KubernetesResourceSpec`](/docs/reference/config/istio.operator.v1alpha12.pb/#KubernetesResourcesSpec),
-which allows the following settings to be changed. Use this list to identify the setting to customize:
-
-1. [Resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#resource-requests-and-limits-of-pod-and-container)
-1. [Readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/)
-1. [Replica count](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
-1. [`HorizontalPodAutoscaler`](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-1. [`PodDisruptionBudget`](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#how-disruption-budgets-work)
-1. [Pod annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
-1. [Service annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
-1. [`ImagePullPolicy`](https://kubernetes.io/docs/concepts/containers/images/)
-1. [Priority class name](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
-1. [Node selector](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
-1. [Affinity and anti-affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
-
-All of these Kubernetes settings use the Kubernetes API definitions, so [Kubernetes documentation](https://kubernetes.io/docs/concepts/) can be used for reference.
-
-### Configure the feature or component
-
-After you identify the name of the feature or component from the previous list, you can use the `IstioControlPlane` API
-to modify the default values using a configuration overlay file.
-
-The following example overlay file adjusts the `TrafficManagement` feature's resources and horizontal pod autoscaling
-settings for Pilot:
-
-{{< text yaml >}}
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
-spec:
-  trafficManagement:
-    components:
-      pilot:
-        k8s:
-          resources:
-            requests:
-              cpu: 1000m # override from default 500m
-              memory: 4096Mi # ... default 2048Mi
-          hpaSpec:
-            maxReplicas: 10 # ... default 5
-            minReplicas: 2  # ... default 1
-{{< /text >}}
-
-Use `manifest apply` to apply the modified settings to the cluster:
-
-{{< text syntax="bash" repo="operator" >}}
-$ istioctl experimental manifest apply -f @samples/pilot-k8s.yaml@
-{{< /text >}}
-
-## Customize Istio settings using the Helm API
-
-The `IstioControlPlane` API includes a pass-through interface to the [Helm API](/docs/reference/config/installation-options/)
-using the `values` field.
-
-The following YAML file configures global and Pilot settings through the Helm API:
-
-{{< text yaml >}}
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
-spec:
-  trafficManagement:
-    components:
-      pilot:
-        values:
-          traceSampling: 0.1 # override from 1.0
-
-  # global Helm settings
+  profile: demo
   values:
-    monitoringPort: 15050
+    global:
+      istioNamespace: istio-namespace1
 {{< /text >}}
-
-Some parameters will temporarily exist in both the Helm and `IstioControlPlane` APIs, including Kubernetes resources,
-namespaces and enablement settings. The Istio community recommends using the `IstioControlPlane` API as it is more
-consistent, is validated, and follows the [community graduation process](https://github.com/istio/community/blob/master/FEATURE-LIFECYCLE-CHECKLIST.md#feature-lifecycle-checklist).
-
-## Show differences in profiles
-
-The `profile diff` sub-command can be used to show the differences between profiles,
-which is useful for checking the effects of customizations before applying changes to a cluster.
-
-You can show differences between the default and demo profiles using these commands:
-
-{{< text bash >}}
-$ istioctl experimental profile dump default > 1.yaml
-$ istioctl experimental profile dump demo > 2.yaml
-$ istioctl experimental profile diff 1.yaml 2.yaml
-{{< /text >}}
-
-## Show differences in manifests
-
-You can show the differences in the generated manifests between the default profile and a customized install using these commands:
-
-{{< text bash >}}
-$ istioctl experimental manifest generate > 1.yaml
-$ istioctl experimental manifest generate -f samples/pilot-k8s.yaml > 2.yaml
-$ istioctl experimental manifest diff 1.yam1 2.yaml
-{{< /text >}}
-
-## Inspect/modify a manifest before installation
-
-You can inspect or modify the manifest before installing Istio using these steps:
-
-Generate the manifest using this command:
-
-{{< text bash >}}
-$ istioctl experimental manifest generate > $HOME/generated-manifest.yaml
-{{< /text >}}
-
-Inspect the manifest as needed, then apply the manifest using this command:
 
 {{< tip >}}
-This command might show transient errors due to resources not being available in
-the cluster in the correct order.
+The Istio operator controller begins the process of installing Istio within 90 seconds of
+the creation of the `IstioOperator` resource. The Istio installation completes within 120
+seconds.
 {{< /tip >}}
 
-{{< text bash >}}
-$ kubectl apply -f $HOME/generated-manifest.yaml
-{{< /text >}}
-
-## Verify a successful installation
-
-You can check if the Istio installation succeeded using the `verify-install` command.
-This compares the installation on your cluster to a manifest you specify
-and displays the results:
+You can confirm the Istio control plane services have been deployed with the following commands:
 
 {{< text bash >}}
-$ istioctl verify-install -f $HOME/generated-manifest.yaml
+$ kubectl get svc -n istio-system
+NAME                        TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                                      AGE
+istio-egressgateway         ClusterIP      10.103.243.113   <none>        80/TCP,443/TCP,15443/TCP                                                     17s
+istio-ingressgateway        LoadBalancer   10.101.204.227   <pending>     15020:31077/TCP,80:30689/TCP,443:32419/TCP,31400:31411/TCP,15443:30176/TCP   17s
+istiod                      ClusterIP      10.96.237.249    <none>        15010/TCP,15012/TCP,443/TCP,15014/TCP,53/UDP,853/TCP                         30s                                                              13s
 {{< /text >}}
-
-## Uninstall Istio
-
-To uninstall Istio, run the following command:
 
 {{< text bash >}}
-$ istioctl experimental manifest generate <your original installation options> | kubectl delete -f -
+$ kubectl get pods -n istio-system
+NAME                                   READY   STATUS    RESTARTS   AGE
+istio-egressgateway-5444c68db8-9h6dz   1/1     Running   0          87s
+istio-ingressgateway-5c68cb968-x7qv9   1/1     Running   0          87s
+istiod-598984548d-wjq9j                1/1     Running   0          99s
 {{< /text >}}
 
-## Additional documentation
+## Update
 
-The Istio Operator CLI is experimental. See the upstream repository [README](https://github.com/istio/operator/blob/master/README.md)
-for additional documentation and examples.
+Now, with the controller running, you can change the Istio configuration by editing or replacing
+the `IstioOperator` resource. The controller will detect the change and respond by updating
+the Istio installation correspondingly.
+
+For example, you can switch the installation to the `default`
+profile with the following command:
+
+{{< text bash >}}
+$ kubectl apply -f - <<EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane
+spec:
+  profile: default
+EOF
+{{< /text >}}
+
+You can also enable or disable components and modify resource settings.
+For example, to enable the `istio-egressgateway` component and increase pilot memory requests:
+
+{{< text bash >}}
+$ kubectl apply -f - <<EOF
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane
+spec:
+  profile: default
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            memory: 3072Mi
+    egressGateways:
+    - name: istio-egressgateway
+      enabled: true
+EOF
+{{< /text >}}
+
+You can observe the changes that the controller makes in the cluster in response to `IstioOperator` CR updates by
+checking the operator controller logs:
+
+{{< text bash >}}
+$ kubectl logs -f -n istio-operator $(kubectl get pods -n istio-operator -lname=istio-operator -o jsonpath='{.items[0].metadata.name}')
+{{< /text >}}
+
+Refer to the [`IstioOperator` API](/docs/reference/config/istio.operator.v1alpha1/#IstioOperatorSpec)
+for the complete set of configuration settings.
+
+## In-place Upgrade
+
+Download and extract the `istioctl` corresponding to the version of Istio you wish to upgrade to. Reinstall the operator
+at the target Istio version:
+
+{{< text bash >}}
+$ <extracted-dir>/bin/istioctl operator init
+{{< /text >}}
+
+You should see that the `istio-operator` pod has restarted and its version has changed to the target version:
+
+{{< text bash >}}
+$ kubectl get pods --namespace istio-operator \
+  -o=jsonpath='{range .items[*]}{.metadata.name}{":\t"}{range .spec.containers[*]}{.image}{", "}{end}{"\n"}{end}'
+{{< /text >}}
+
+After a minute or two, the Istio control plane components should also be restarted at the new version:
+
+{{< text bash >}}
+$ kubectl get pods --namespace istio-system \
+  -o=jsonpath='{range .items[*]}{"\n"}{.metadata.name}{":\t"}{range .spec.containers[*]}{.image}{", "}{end}{"\n"}{end}'
+{{< /text >}}
+
+## Canary Upgrade
+
+The process for canary upgrade is similar to the [canary upgrade with `istioctl`](/docs/setup/upgrade/canary/).
+
+For example, to upgrade the revision of Istio installed in the previous section, first verify that the `IstioOperator` CR named `example-istiocontrolplane` exists in your cluster:
+
+{{< text bash >}}
+$ kubectl get iop --all-namespaces
+NAMESPACE      NAME                        REVISION   STATUS    AGE
+istio-system   example-istiocontrolplane              HEALTHY   11m
+{{< /text >}}
+
+Download and extract the `istioctl` corresponding to the version of Istio you wish to upgrade to.
+Then, run the following command to install the new target revision of the Istio control plane based on the in-cluster
+`IstioOperator` CR (here, we assume the target revision is 1.8.1):
+
+{{< text bash >}}
+$ istio-1.8.1/bin/istioctl operator init --revision 1-8-1
+{{< /text >}}
+
+{{< tip >}}
+You can alternatively use Helm to deploy another operator with a different revision setting:
+
+{{< text bash >}}
+$ helm install istio-operator manifests/charts/istio-operator \
+  --set operatorNamespace=istio-operator \
+  --set watchedNamespaces=istio-system \
+  --set revision=1-9-0
+{{< /text >}}
+
+{{< boilerplate helm-hub-tag >}}
+
+Note that you need to [download the Istio release](/docs/setup/getting-started/#download)
+to run the above command.
+{{< /tip >}}
+
+Make a copy of the `example-istiocontrolplane` CR and save it in a file named `example-istiocontrolplane-1-8-1.yaml`.
+Change the name to `example-istiocontrolplane-1-8-1` and add `revision: 1-8-1` to the CR.
+Your updated `IstioOperator` CR should look something like this:
+
+{{< text bash >}}
+$ cat example-istiocontrolplane-1-8-1.yaml
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: example-istiocontrolplane-1-8-1
+spec:
+  revision: 1-8-1
+  profile: demo
+{{< /text >}}
+
+Apply the updated `IstioOperator` CR to the cluster. After that, you will have two control plane deployments and services running side-by-side:
+
+{{< text bash >}}
+$ kubectl get pod -n istio-system -l app=istiod
+NAME                            READY   STATUS    RESTARTS   AGE
+istiod-1-8-1-597475f4f6-bgtcz   1/1     Running   0          64s
+istiod-6ffcc65b96-bxzv5         1/1     Running   0          2m11s
+{{< /text >}}
+
+{{< text bash >}}
+$ kubectl get svc -n istio-system -l app=istiod
+NAME           TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                         AGE
+istiod         ClusterIP   10.104.129.150   <none>        15010/TCP,15012/TCP,443/TCP,15014/TCP,853/TCP   2m35s
+istiod-1-8-1   ClusterIP   10.111.17.49     <none>        15010/TCP,15012/TCP,443/TCP,15014/TCP           88s
+{{< /text >}}
+
+To complete the upgrade, label the workload namespaces with `istio.io/rev=1-8-1` and restart the workloads, as
+explained in the [Data plane upgrade](/docs/setup/upgrade/canary/#data-plane) documentation.
+
+## Uninstall
+
+If you used the operator to perform a canary upgrade of the control plane, you can uninstall the old control plane and keep the new one by deleting the old in-cluster `IstioOperator` CR, which will uninstall the old revision of Istio:
+
+{{< text bash >}}
+$ kubectl delete istiooperators.install.istio.io -n istio-system example-istiocontrolplane
+{{< /text >}}
+
+Wait until Istio is uninstalled - this may take some time.
+
+Then you can remove the Istio operator for the old revision by running the following command:
+
+{{< text bash >}}
+$ istioctl operator remove --revision <revision>
+{{< /text >}}
+
+If you omit the `revision` flag, then all revisions of Istio operator will be removed.
+
+Note that deleting the operator before the `IstioOperator` CR and corresponding Istio revision are fully removed may result in leftover Istio resources.
+To clean up anything not removed by the operator:
+
+{{< text bash >}}
+$ istioctl manifest generate | kubectl delete -f -
+$ kubectl delete ns istio-system --grace-period=0 --force
+ {{< /text >}}

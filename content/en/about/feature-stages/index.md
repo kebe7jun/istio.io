@@ -10,11 +10,6 @@ aliases:
 icon: feature-status
 ---
 
-<!--
-Note: this contains feature status from
-https://docs.google.com/spreadsheets/d/1Nbjat-juyQ8AWhkq3njLckmHM8TRL4O-sjm9Bfr9zrU/edit#gid=0
--->
-
 This page lists the relative maturity and support
 level of every Istio feature. Please note that the phases (Alpha, Beta, and Stable) are applied to individual features
 within the project, not to the project as a whole. Here is a high level description of what these labels mean.
@@ -33,7 +28,7 @@ within the project, not to the project as a whole. Here is a high level descript
 
 Below is our list of existing features and their current phases. This information will be updated after every monthly release.
 
-### Traffic Management
+### Traffic management
 
 | Feature           | Phase
 |-------------------|-------------------
@@ -44,70 +39,62 @@ Below is our list of existing features and their current phases. This informatio
 | Gateway: Ingress, Egress for all protocols | Stable
 | TLS termination and SNI Support in Gateways | Stable
 | SNI (multiple certs) at ingress | Stable
-| [Locality load balancing](/docs/ops/traffic-management/locality-load-balancing/) | Beta
+| [Locality load balancing](/docs/tasks/traffic-management/locality-load-balancing/) | Beta
 | Enabling custom filters in Envoy | Alpha
 | CNI container interface | Alpha
-| [Sidecar API](/docs/reference/config/networking/v1alpha3/sidecar/) | Alpha
-
-The `Sidecar` runtime is considered Beta.  However, its API is still subject to a backwards incompatible change.  Due to this, we advertise it as Alpha.
+| [Sidecar API](/docs/reference/config/networking/sidecar/) | Beta
+| [DNS Proxying](/docs/ops/configuration/traffic-management/dns-proxy/) | Alpha
+| [Kubernetes service-apis](/docs/tasks/traffic-management/ingress/service-apis/) | Alpha
 
 ### Observability
 
 | Feature           | Phase
 |-------------------|-------------------
 | [Prometheus Integration](/docs/tasks/observability/metrics/querying-metrics/) | Stable
-| [Local Logging (STDIO)](/docs/tasks/observability/logs/collecting-logs/) | Stable
-| [Statsd Integration](/docs/reference/config/policy-and-telemetry/adapters/statsd/) | Stable
-| [Client and Server Telemetry Reporting](/docs/reference/config/policy-and-telemetry/) | Stable
+| [Client and Server Telemetry Reporting](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/) | Stable
 | [Service Dashboard in Grafana](/docs/tasks/observability/metrics/using-istio-dashboard/) | Stable
-| [Istio Component Dashboard in Grafana](/docs/tasks/observability/metrics/using-istio-dashboard/) | Stable
 | [Distributed Tracing](/docs/tasks/observability/distributed-tracing/) | Stable
-| [Stackdriver Integration](/docs/reference/config/policy-and-telemetry/adapters/stackdriver/) | Beta
+| [Stackdriver Integration](/docs/reference/config/proxy_extensions/stackdriver/) | Stable
 | [Distributed Tracing to Zipkin / Jaeger](/docs/tasks/observability/distributed-tracing/) | Beta
-| [Logging with Fluentd](/docs/tasks/observability/logs/fluentd/) | Beta
-| [Trace Sampling](/docs/tasks/observability/distributed-tracing/overview/#trace-sampling) | Beta
+| [Trace Sampling](/docs/tasks/observability/distributed-tracing/configurability/#trace-sampling) | Beta
+| [Request Classification](/docs/tasks/observability/metrics/classify-metrics/) | Beta
 
-### Security and Policy Enforcement
+### Extensibility
 
 | Feature           | Phase
 |-------------------|-------------------
-| [Deny Checker](/docs/reference/config/policy-and-telemetry/adapters/denier/)         | Stable
-| [List Checker](/docs/reference/config/policy-and-telemetry/adapters/list/)        | Stable
-| [Pluggable Key/Cert Support for Istio CA](/docs/tasks/security/plugin-ca-cert/)        | Stable
+| WebAssembly Extension | Alpha
+
+### Security and policy enforcement
+
+| Feature           | Phase
+|-------------------|-------------------
 | [Service-to-service mutual TLS](/docs/concepts/security/#mutual-tls-authentication)         | Stable
 | [Kubernetes: Service Credential Distribution](/docs/concepts/security/#pki)   | Stable
+| [Certificate management on Ingress Gateway](/docs/tasks/traffic-management/ingress/secure-ingress) | Stable
+| [Pluggable Key/Cert Support for Istio CA](/docs/tasks/security/cert-management/plugin-ca-cert/)        | Stable
+| [Authorization](/docs/concepts/security/#authorization)   | Beta
+| [End User (JWT) Authentication](/docs/concepts/security/#authentication)  | Beta
+| [Automatic mutual TLS](/docs/tasks/security/authentication/authn-policy/#auto-mutual-tls) | Beta
 | [VM: Service Credential Distribution](/docs/concepts/security/#pki)         | Beta
-| [Mutual TLS Migration](/docs/tasks/security/mtls-migration)    | Beta
-| [Cert management on Ingress Gateway](/docs/tasks/traffic-management/ingress/secure-ingress-sds) | Beta
-| [Authorization (RBAC)](/docs/concepts/security/#authorization)   | Alpha
-| [End User (JWT) Authentication](/docs/concepts/security/#authentication)  | Alpha
-| [OPA Checker](/docs/reference/config/policy-and-telemetry/adapters/opa/)    | Alpha
-| [TCP Authorization (RBAC)](/docs/tasks/security/authz-tcp) | Alpha
-| [SDS Integration](/docs/tasks/security/auth-sds/) | Alpha
-
-The 'Authorization (RBAC)' runtime is considered Beta.  However, its API is still subject to a backwards incompatible change.  Due to this, we advertise it as Alpha.
+| [Mutual TLS Migration](/docs/tasks/security/authentication/mtls-migration)    | Beta
 
 ### Core
 
 | Feature           | Phase
 |-------------------|-------------------
-| [Operator installation](/docs/setup/install/operator/)        | Alpha
-| [Kubernetes: Envoy Installation and Traffic Interception](/docs/setup/)        | Stable
+| [Standalone Operator](/docs/setup/install/operator/) | Beta
+| [Kubernetes: Envoy Installation and Traffic Interception](/docs/setup/) | Stable
 | [Kubernetes: Istio Control Plane Installation](/docs/setup/) | Stable
-| [Attribute Expression Language](/docs/reference/config/policy-and-telemetry/expression-language/)        | Stable
-| Mixer Out-of-Process Adapter Authoring Model | Beta
-| [Helm](/docs/setup/install/helm/) | Beta
-| [Multicluster Mesh over VPN](/docs/setup/install/multicluster/) | Alpha
-| [Kubernetes: Istio Control Plane Upgrade](/docs/setup/) | Beta
-| Consul Integration | Alpha
+| [Multicluster Mesh](/docs/setup/install/multicluster/) | Beta
+| [External Control Plane](/docs/setup/additional-setup/external-controlplane/) | Alpha
+| [Kubernetes: Istio Control Plane Upgrade](/docs/setup/upgrade/) | Beta
 | Basic Configuration Resource Validation | Beta
-| Configuration Processing with Galley | Beta
-| [Mixer Self Monitoring](/faq/mixer/#mixer-self-monitoring) | Beta
-| [Custom Mixer Build Model](https://github.com/istio/istio/wiki/Mixer-Compiled-In-Adapter-Dev-Guide) | deprecated
-| [Out of Process Mixer Adapters (gRPC Adapters)](https://github.com/istio/istio/wiki/Mixer-Out-Of-Process-Adapter-Dev-Guide) | Beta
 | [Istio CNI plugin](/docs/setup/additional-setup/cni/) | Alpha
-| IPv6 support for Kubernetes | Alpha
-| [Distroless base images for Istio](/docs/ops/security/harden-docker-images/) | Alpha
+| IPv6 Support for Kubernetes | Alpha. Dual-stack IPv4 and IPv6 is not supported.
+| [Distroless Base Images for Istio](/docs/ops/configuration/security/harden-docker-images/) | Alpha
+| [Virtual Machine Integration](/docs/setup/install/virtual-machine/) | Beta
+| [Helm Based Installation](/docs/setup/install/helm/) | Alpha
 
 {{< idea >}}
 Please get in touch by joining our [community](/about/community/) if there are features you'd like to see in our future releases!

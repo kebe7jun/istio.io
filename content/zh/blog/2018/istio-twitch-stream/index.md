@@ -4,23 +4,24 @@ subtitle:
 description: Istio 在 Twitch 举办了为期一天的直播庆祝 1.0 的发布。
 publishdate: 2018-08-03
 attribution: Spencer Krum, IBM
+target_release: 1.0
 ---
 
-为了庆祝 Istio 1.0 版本的发布并向更广泛的受众推广该软件，8月17日 Istio 社区在 Twitch 举办了一天的实况直播。
+为了庆祝 Istio 1.0 版本的发布并向更广泛的受众推广该软件，8 月 17 日 Istio 社区在 Twitch 举办了一天的实况直播。
 
-## Twitch 是什么？
+## Twitch 是什么？{#what-is-twitch}
 
 [Twitch](https://twitch.tv/) 是一个流行的视频游戏直播流媒体平台，最近也看到了大量的编码内容出现。IBM 的倡导者一直在那里进行实况编码和演示，这是很有趣的事情。虽然大多数都是和游戏有关的内容，但是在网站上与编程相关的分享和观看的[社区](https://www.twitch.tv/communities/programming)在持续增长中。
 
-## 它用 Istio 做了什么？
+## 它用 Istio 做了什么？{#what-does-this-have-to-do-with-Istio}
 
-Istio 在平台上发布的全天的内容，希望可以给观众讲解如何将深度技术内容、初级内容和业务线内容做良好融合。我们有开发人员、用户和布道者来分享示例和故事。期待现场编码，QA 和一些惊喜。我们有来自 IBM、Google、Datadog、Pivotal和更多的明星嘉宾。
+Istio 在平台上发布的全天的内容，希望可以给观众讲解如何将深度技术内容、初级内容和业务线内容做良好融合。我们有开发人员、用户和布道者来分享示例和故事。期待现场编码，QA 和一些惊喜。我们有来自 IBM、Google、Datadog、Pivotal 和更多的明星嘉宾。
 
-## 如何观看
+## 如何观看{#recordings}
 
-很简单！只要在8月17日上午10点导航到[这里](https://twitch.tv/ibmcode)。
+很简单！只要在 8 月 17 日上午 10 点导航到[这里](https://twitch.tv/ibmcode)。
 
-## 安排
+## 安排{#schedule}
 
 任何时候都是 `PDT`.
 
@@ -43,7 +44,3 @@ Istio 在平台上发布的全天的内容，希望可以给观众讲解如何�
 | 3:00 - 3:20  | `Google/IBM China` | `Google / IBM` |
 | 3:20 - 3:40 | `Colby Dyess` | `Tuffin` |
 | 3:40 - 4:00  | `Rohit Agarwalla` | `Cisco` |
-
-## 参加直播活动
-
-我们希望你也能来。在 Istio slack 或 rocket chat 上联系 ``@nibalizer`` 就可以开始了。

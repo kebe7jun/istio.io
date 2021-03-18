@@ -10,11 +10,9 @@ weight: 50
 TRACING_POD=`kubectl get po -n <istio namespace> | grep istio-tracing | awk '{print $1}'`
 $ kubectl delete pod $TRACING_POD -n <istio namespace>
 $ kubectl delete services tracing zipkin   -n <istio namespace>
-# 从 Mixer Deployment 中移除对 zipkin url 的引用
-$ kubectl -n istio-system edit deployment istio-telemetry
 # 现在，手动从文件中移除 trace_zipkin_url 的实例，保存文件
 {{< /text >}}
 
-然后遵循[分布式追踪任务的清理部分](/zh/docs/tasks/telemetry/distributed-tracing/zipkin/#清理)的步骤进行后续操作。
+然后遵循[分布式追踪任务的清理部分](/zh/docs/tasks/observability/distributed-tracing/zipkin/#cleanup)的步骤进行后续操作。
 
-如果您根本不想要追踪功能，那么就在安装 Istio 时[禁用追踪](/zh/docs/tasks/telemetry/distributed-tracing/zipkin/#开始之前)。
+如果您不想要追踪功能，那么就在安装 Istio 时[禁用追踪](/zh/docs/tasks/observability/distributed-tracing/zipkin/#before-you-begin)。

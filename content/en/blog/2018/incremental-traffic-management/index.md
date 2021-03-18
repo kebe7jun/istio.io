@@ -6,6 +6,7 @@ subtitle:
 attribution: Sandeep Parikh
 twitter: crcsmnky
 keywords: [traffic-management,gateway]
+target_release: 1.0
 ---
 
 Traffic management is one of the critical benefits provided by Istio. At the heart of Istio’s traffic management is the ability to decouple traffic flow and infrastructure scaling. This lets you control your traffic in ways that aren’t possible without a service mesh like Istio.
@@ -44,7 +45,7 @@ Fortunately, a standard Istio deployment already includes a [Gateway](/docs/conc
 
 ## In action: traffic routing with Istio
 
-A simple way to see this type of approach in action is to first setup your Kubernetes environment using the [Platform Setup](/docs/setup/platform-setup/) instructions, and then install the **minimal** Istio profile using [Helm](/docs/setup/install/helm/), including only the traffic management components (ingress gateway, egress gateway, Pilot). The following example uses [Google Kubernetes Engine](https://cloud.google.com/gke).
+A simple way to see this type of approach in action is to first setup your Kubernetes environment using the [Platform Setup](/docs/setup/platform-setup/) instructions, and then install the **minimal** Istio profile using [Helm](https://archive.istio.io/1.4/docs/setup/install/helm/), including only the traffic management components (ingress gateway, egress gateway, Pilot). The following example uses [Google Kubernetes Engine](https://cloud.google.com/gke).
 
 First, setup and configure [GKE](/docs/setup/platform-setup/gke/):
 
@@ -56,7 +57,7 @@ $ kubectl create clusterrolebinding cluster-admin-binding \
    --user=$(gcloud config get-value core/account)
 {{< /text >}}
 
-Next, [install Helm](https://helm.sh/docs/securing_installation/) and [generate a minimal Istio install](/docs/setup/install/helm/) -- only traffic management components:
+Next, [install Helm](https://helm.sh/docs/intro/install/) and [generate a minimal Istio install](https://archive.istio.io/1.4/docs/setup/install/helm/) -- only traffic management components:
 
 {{< text bash >}}
 $ helm template install/kubernetes/helm/istio \

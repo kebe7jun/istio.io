@@ -5,6 +5,7 @@ publishdate: 2019-03-19
 subtitle: An overview of Istio 1.1 performance improvements
 attribution: Surya V Duggirala (IBM), Mandar Jog (Google), Jose Nativio (IBM)
 keywords: [performance,scalability,scale,benchmarks]
+target_release: 1.1
 ---
 
 Hyper-scale, microservice-based cloud environments have been exciting to build but challenging to manage. Along came Kubernetes (container orchestration) in 2014, followed by Istio (container service management) in 2017. Both open-source projects enable developers to scale container-based applications without spending too much time on administration tasks.
@@ -52,7 +53,7 @@ Istio 1.1 introduces new features and optimizations to help harden the service m
 
 ## Useful links
 
-* [Istio Service Mesh Performance (34:30)](https://www.youtube.com/watch?time_continue=349&v=G4F5aRFEXnU), by Surya Duggirala, Laurent Demailly and Fawad Khaliq at Kubecon Europe 2018
+* [Istio Service Mesh Performance (34:30)](https://www.youtube.com/watch?time_continue=349&v=G4F5aRFEXnU), by Surya Duggirala, Laurent Demailly and Fawad Khaliq at KubeCon Europe 2018
 * [Istio Performance and Scalability discussion forum](https://discuss.istio.io/c/performance-and-scalability)
 
 ## Disclaimer

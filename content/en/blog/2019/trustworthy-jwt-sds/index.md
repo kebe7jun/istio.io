@@ -4,6 +4,7 @@ description: Taking advantage of Kubernetes trustworthy JWTs to issue certificat
 publishdate: 2019-09-10
 attribution: Phillip Quy Le (Google)
 keywords: [security, PKI, certificate, nodeagent, sds]
+target_release: 1.2
 ---
 
 In Istio 1.3, we are taking advantage of improvements in Kubernetes to issue certificates for workload instances more securely.
@@ -18,7 +19,7 @@ Before Kubernetes 1.12, the Kubernetes API server issues JWTs with the following
 1. The tokens are mounted onto all the pods without a way to opt-out. See [Service Account Token Volumes](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/svcacct-token-volume-source.md) for motivation.
 
 Kubernetes 1.12 introduces `trustworthy` JWTs to solve these issues.
-However, support for the `aud` field to have a different value than the API server audience didn't become available until [Kubernetes 1.13](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.13.md).
+However, support for the `aud` field to have a different value than the API server audience didn't become available until [Kubernetes 1.13](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.13.md).
 To better secure the mesh, Istio 1.3 only supports `trustworthy` JWTs and requires the value of the `aud` field to be `istio-ca` when you enable SDS.
 Before upgrading your Istio deployment to 1.3 with SDS enabled, verify that you use Kubernetes 1.13 or later.
 

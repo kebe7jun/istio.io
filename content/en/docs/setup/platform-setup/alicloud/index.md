@@ -1,13 +1,19 @@
 ---
 title: Alibaba Cloud
 description: Instructions to setup an Alibaba Cloud Kubernetes cluster for Istio.
-weight: 3
+weight: 5
 skip_seealso: true
 aliases:
     - /docs/setup/kubernetes/prepare/platform-setup/alicloud/
     - /docs/setup/kubernetes/platform-setup/alicloud/
 keywords: [platform-setup,alibaba-cloud,aliyun,alicloud]
+owner: istio/wg-environments-maintainers
+test: n/a
 ---
+
+This page was last updated August 8, 2018.
+
+{{< boilerplate untested-document >}}
 
 Follow these instructions to prepare an
 [Alibaba Cloud Kubernetes Container Service](https://www.alibabacloud.com/product/kubernetes)

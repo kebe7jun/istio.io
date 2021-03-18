@@ -1,65 +1,70 @@
 ---
-title: 报告 Istio 安全漏洞
-description: 负责披露 Istio 安全漏洞。
+title: 安全漏洞
+description: 我们如何处理安全漏洞。
 weight: 35
 icon: vulnerabilities
 ---
 
-我们非常感谢报告 Istio 安全漏洞的安全研究人员和用户。我们会对每个报告进行彻底调查。
+我们非常感谢那些报告 Istio 安全漏洞的安全研究人员和用户。我们会彻底分析和评估每份报告。
 
-## 报告漏洞{#Reporting-a-vulnerability}
+## 报告漏洞{#reporting-a-vulnerability}
 
-创建报告，可以发送电子邮件至 [istio-security-vulnerability-reports@googlegroups.com](mailto:istio-security-vulnerability-reports@googlegroups.com) 邮件列表，包含漏洞详细信息。对于与潜在安全漏洞无关的常见产品错误，请访问我们的[`报告错误页面`](/zh/about/bugs)了解该怎么做。
+要进行漏洞报告，请将包含漏洞详细信息的电子邮件发送到 [istio-security-vulnerability-reports@googlegroups.com](mailto:istio-security-vulnerability-reports@googlegroups.com)，
+对于与潜在安全漏洞无关的普通产品错误，请转到我们的[报告错误](/zh/about/bugs/)页面以了解如何操作。
 
-### 何时报告安全漏洞？
+### 何时报告安全漏洞？{#when-to-report-a-security-vulnerability}
 
-以下情况您可以发送安全漏洞报告：
+只要您有以下情况，请向我们发送报告：
 
-- 考虑 Istio 存在潜在的安全漏洞。
-- 不确定漏洞是否或如何影响 Istio 。
-- 认为 Istio 所依赖的另一个项目中存在漏洞。例如：Envoy 、Docker 或 Kubernetes 。
+- 认为 Istio 具有潜在的安全漏洞。
+- 不确定漏洞是否或如何影响 Istio。
+- 认为 Istio 依赖的另一个项目中存在漏洞。例如：Envoy，Docker 或 Kubernetes。
 
-### 何时不应该报告安全漏洞？
+当不确定的时候，请向我们私下披露。这包括但不限于：
 
-以下情况下不要发送漏洞报告：
+- 任何的崩溃，特别是在 Envoy 中
+- 任何的安全策略（比如认证或授权）的绕过或者脆弱性
+- 任何潜在的拒绝服务（DoS）
 
-- 您需要帮助调优 Istio 组件以确保安全性。
-- 您需要帮助应用与安全相关的更新。
+### 什么时候不报告安全漏洞？{#when-not-to-report-a-security-vulnerability}
+
+在以下情况下，请勿发送漏洞报告：
+
+- 您需要帮助调整 Istio 组件的安全性。
+- 您需要使用安全更新相关的帮助。
 - 您的问题与安全性无关。
 
 ## 评估{#evaluation}
 
-Istio 安全团队在三个工作日内确认并分析每个漏洞报告。
+Istio 安全团队会在三个工作日内确认并分析每个漏洞报告。
 
-您与 Istio 安全团队共享的任何漏洞信息都保留在 Istio 项目中。我们不会将信息传播给其他项目。我们仅根据需要共享信息以解决问题。
+您与 Istio 安全团队共享的任何漏洞信息都属于 Istio 项目，我们仅共享解决问题所需的信息，不会将信息传播给其他项目。
 
-随着安全问题的状态从 `triaged` 转变为 `identified fix`，再到 `release planning`，我们随时更新给报告者。
+从 `triaged` 到 `identified fix` 再到 `release planning`，我们会随时反馈安全问题的状态。
 
-## 解决问题{#fixing-the-issue}
+## 修复问题{#fixing-the-issue}
 
-一旦证实了安全漏洞，Istio 团队就会开发修复程序。修复程序的开发和测试在私有 GitHub 存储库中，以防止过早泄露漏洞。
+一旦对安全漏洞进行了充分描述，Istio 团队就会开发出修复程序。修补程序的开发和测试在私有 GitHub 仓库中进行，以防止过早披露此漏洞信息。
 
 ## 早期披露{#early-disclosure}
 
-在向公众披露漏洞之前，有一小部分 Istio 合作伙伴会获得早期私下披露。这是为了使分发 Istio 二进制文件的合作伙伴能够充分准备分发修复程序。
+Istio 项目维护了一个邮件列表，用于在私下及早的公开安全漏洞。该列表用于提供可操作的信息给与 Istio 密切的合作伙伴。该列表不用于让个人了解安全问题。
 
-在完全公开披露之前三个工作日就会发生早期披露。
-
-请填写[早期安全漏洞披露](https://github.com/istio/community/issues/new?template=early-disclosure-request.md)表单，以请求添加到早期披露邮件列表中。
+请参阅[早期披露的安全漏洞](https://github.com/istio/community/blob/master/EARLY-DISCLOSURE.md)以获取更多信息。
 
 ## 公开披露{#public-disclosure}
 
-在选择公开披露的那一天，一系列活动尽快进行：
+在选择公开披露的当天，下面一系列动作会尽可能快的进行：
 
-- 更改将从包含修订的私有 GitHub 存储库合并到适当的公共分支中。
+- 将私有 GitHub 仓库中拥有修复程序的分支与公共仓库的相应分支进行合并。
 
-- 发布工程师确保及时构建和发布所有必需的二进制文件。
+- 发布工程师确保所有必要的二进制文件都可以迅速生成和发布。
 
-- 二进制文件可用后，将在以下渠道发送通知：
+- 二进制文件可用后，将通过以下渠道发送公告：
 
-    - [Istio博客](/zh/blog)
-    - discuss.istio.io 上的[公告](https://discuss.istio.io/c/announcements)类别
-    - [Istio Twitter 反馈](https://twitter.com/IstioMesh)
-    - [Slack 上的 #announcement 频道](https://istio.slack.com/messages/CFXS256EQ/)
+    - [Istio 博客](/zh/blog)
+    - discuss.istio.io 上的 [Announcements](https://discuss.istio.io/c/announcements) 栏目
+    - [Istio Twitter feed](https://twitter.com/IstioMesh)
+    - Slack 上的 [#announcements](https://istio.slack.com/messages/CFXS256EQ/) 频道
 
-该公告应该尽可能具有可执行性，包括用户在升级到固定版本之前可以采取的临时解决方案。这些公告的建议时间是周一至周四的 16:00（UTC）。这意味着该公告将在太平洋早晨，欧洲傍晚和亚洲傍晚发出。
+该公告将尽可能包含客户在升级到固定版本之前能够采取的任何缓解措施，这些公告的建议发布时间是 UTC 时间星期一至四的 16:00。这意味着该公告将在太平洋时间的早上、欧洲傍晚和亚洲傍晚发布。

@@ -1,13 +1,19 @@
 ---
 title: MicroK8s
 description: Instructions to setup MicroK8s for use with Istio.
-weight: 20
+weight: 45
 skip_seealso: true
 aliases:
     - /docs/setup/kubernetes/prepare/platform-setup/MicroK8s/
     - /docs/setup/kubernetes/platform-setup/MicroK8s/
 keywords: [platform-setup,kubernetes,MicroK8s]
+owner: istio/wg-environments-maintainers
+test: no
 ---
+
+This page was last updated August 28, 2019.
+
+{{< boilerplate untested-document >}}
 
 Follow these instructions to prepare MicroK8s for using Istio.
 
@@ -15,7 +21,7 @@ Follow these instructions to prepare MicroK8s for using Istio.
 Administrative privileges are required to run MicroK8s.
 {{< /warning >}}
 
-1.  Install the latest version of [MicroK8s](https://microK8s.io) using the command
+1.  Install the latest version of [MicroK8s](https://microk8s.io) using the command
 
     {{< text bash >}}
     $ sudo snap install microk8s --classic

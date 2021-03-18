@@ -1,12 +1,18 @@
 ---
 title: Kubernetes Gardener
 description: Instructions to setup a Gardener cluster for Istio.
-weight: 19
+weight: 35
 aliases:
     - /docs/setup/kubernetes/platform-setup/gardener/
 skip_seealso: true
 keywords: [platform-setup,kubernetes,gardener,sap]
+owner: istio/wg-environments-maintainers
+test: no
 ---
+
+This page was last updated June 28, 2019.
+
+{{< boilerplate untested-document >}}
 
 ## Bootstrapping Gardener
 

@@ -1,13 +1,15 @@
 ---
 title: Docker Desktop
 description: Instructions to setup Docker Desktop for Istio.
-weight: 12
+weight: 15
 skip_seealso: true
 aliases:
     - /docs/setup/kubernetes/prepare/platform-setup/docker-for-desktop/
     - /docs/setup/kubernetes/prepare/platform-setup/docker/
     - /docs/setup/kubernetes/platform-setup/docker/
 keywords: [platform-setup,kubernetes,docker-desktop]
+owner: istio/wg-environments-maintainers
+test: no
 ---
 
 1. To run Istio with Docker Desktop, install a version which contains a supported Kubernetes version

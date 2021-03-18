@@ -1,83 +1,86 @@
 ---
-title: 使用 GitHub
-description: 向您展示如何使用 GitHub 处理 Istio 文档。
-weight: 20
+title: 使用 GitHub 参与社区活动
+description: 向您展示如何使用 GitHub 参与贡献 Istio 文档。
+weight: 30
+aliases:
+    - /zh/docs/welcome/contribute/creating-a-pull-request.html
+    - /zh/docs/welcome/contribute/staging-your-changes.html
+    - /zh/docs/welcome/contribute/editing.html
+    - /zh/about/contribute/creating-a-pull-request
+    - /zh/about/contribute/editing
+    - /zh/about/contribute/staging-your-changes
 keywords: [contribute,community,github,pr]
 ---
 
-很高兴您有兴趣为改进和扩展我们的文档做出贡献！在开始之前，请花点时间熟悉下程序。
+Istio 文档协作遵循标准的 [GitHub 协作流](https://guides.github.com/introduction/flow/)。这种成熟的协作模式有助于开源项目管理以下类型的贡献：
 
-要处理 Istio 文档，您需要：
+- [添加](/zh/about/contribute/add-content)新文件到存储库。
+- [编辑](#quick-edit)现有文件。
+- [审阅](/zh/about/contribute/review)添加或修改的文件。
+- 管理多个发布或开发[分支](#branching-strategy)。
 
-1. 创建一个 [GitHub 账号](https://github.com)。
+该贡献指南假定您可以完成以下任务：
 
-1. 签署[贡献者证书协议](https://github.com/istio/community/blob/master/CONTRIBUTING.md#contributor-license-agreements)。
+- Fork [Istio 文档存储库](https://github.com/istio/istio.io)。
+- 为您的更改创建分支。
+- 向该分支添加提交。
+- 打开一个 PR 分享您的贡献。
 
-该文档是在 [Apache 2.0](https://github.com/istio/istio.io/blob/master/LICENSE) 许可下发布的。
+## 开始之前{#how-to-contribute}
 
-## 如何贡献
+要为 Istio 贡献文档，您需要：
 
-为 Istio 贡献文档有三种方式：
+1. 创建 [GitHub 帐户](https://github.com)。
 
-* 如果要编辑现有页面，可以在浏览器中打开页面，然后从每页右上角的齿轮菜单中选择**在 GitHub 上编辑此页面**选项。这将带您到 GitHub 上对页面进行编辑，并可以提交更改。
+1. 签署[贡献者许可协议](https://github.com/istio/community/blob/master/CONTRIBUTING.md#contributor-license-agreements)。
 
-* 还有更为通用的方式来对站点进行修改，具体步骤在[如何创建新内容](#add)一节中有更多介绍。
+1. 安装 [Docker](https://www.docker.com/get-started)，以预览和测试您的文档更改。
 
-* 如果想要对现有的 Pull Request（PR）进行评审，请参看[内容评审](#review)的相关内容。
+文档是根据 [Apache 2.0](https://github.com/istio/istio.io/blob/master/LICENSE) 协议许可发布的。
 
-变更请求被合并之后，会马上在 `preliminary.istio.io` 进行呈现。然而 `istio.io` 上的内容不会立即变更，这个站点的内容仅在有新版本发布的时候才会更新，通常是一个季度一次。
+## 快速编辑 {#quick-edit}
 
-## 如何创建新内容 {#add}
+任何签署了 CLA 的 GitHub 帐户，都可以对 Istio 网站上的任何页面进行修改并提交贡献。这个过程非常简单：
 
-要加入新内容，首先要 Fork 文档版本仓库，然后从你的 Fork 中创建一个 PR 到文档版本库之中。具体步骤如下：
+1. 访问您要编辑的页面。
+1. 将 `preliminary` 添加到 URL 的开头。例如，要编辑 `https://istio.io/about`，新 URL 应为 `https://preliminary.istio.io/about`。
+1. 单击右下角的铅笔图标。
+1. 在 GitHub UI 上进行编辑。
+1. 创建 Pull Request 提交您的修改。
 
-<a class="btn"
-href="https://github.com/istio/istio.io/">Browse this site's source
-code</a>
+请参阅我们在[贡献新内容](/zh/about/contribute/add-content)或[内容审查](/zh/about/contribute/review)中的指南，
+以了解有关提交更多实质性更改的详细信息。
 
-1. 点击上面的按钮，浏览 GitHub 仓库。
+## 分支策略{#branching-strategy}
 
-1. 点击右上角的 **Fork** 按钮，在自己的 GitHub 账号下复制一个文档版本库的副本。
+文档内容的维护在 `istio/istio.io` 仓库 Master 分支进行，Istio 发布当天，我们基于 Master 创建发布分支。以下链接指向我们在 GitHub 上的存储库：
 
-1. 在本地克隆这个新副本，进行编辑。
+<a class="btn" href="https://github.com/istio/istio.io/">查看站点源码</a>
 
-1. 完成变更之后，将变更内容推送到前面 Fork 产生的版本库之中。
+Istio 文档存储库使用多个分支发布所有 Istio 版本的文档。每个 Istio 发布都有相应的文档分支。例如，类似 `release-1.0`、`release-1.1`、`release-1.2` 等分支，都是在相应的发布日创建的。若要查看特定版本的文档，请参阅[存档页](https://archive.istio.io/)。
 
-1. 前往 Fork 版本库的首页，点击 **New Pull Request**，通知项目成员。
+这种分支策略允许我们提供以下 Istio 在线资源：
 
-## 如何评审内容 {#review}
+- [发布站点](/zh/docs/)提供当前最新发布分支的内容。
 
-如果你的评审意见很少，只要简单的给 PR 加上说明就可以了。如果你的评审比较详细，请按以下步骤执行：
+- 预备站点 `https://preliminary.istio.io` 发布了当前 Master 分支上的最新内容。
 
-1. 在 PR 中加入回复 `/hold`。这个命令会阻止该 PR 的合并，直到完成评审完成为止。
+- [存档站点](https://archive.istio.io)提供所有已发布分支的内容。
 
-1. 开始评审。可以在文件的指定行上直接写入意见。
+考虑到分支的工作原理，如果您提交修改到 master 分支，在 Istio 的下一个 major 版本发布前，这些更改都不会被应用到 istio.io。
+如果您的文档更改和当前 Istio 版本密切相关，也可以将更改应用到当前版本的 Release 分支。您可以通过在文档的 PR 上使用 cherry-pick 标签，自动地执行此操作。
+例如，如果您在 PR 中向 master 分支引入了更正，则可以通过 `cherrypick/release-1.4` 标签以将此更改合并到 `release-1.4` 分支。
 
-1. 可以为 PR 的所有者提出一些建议，例如：
+一旦您的初始 PR 被合并，将自动在 Release 分支创建一个包含您的更改的 PR。为了使 `CLA` 机器人可以继续工作，您可能需要在 PR 上添加一个内容为 `@googlebot I consent` 的评论。
 
-    {{< text markdown >}}
-    Use present tense to avoid verb congruence issues and
-    to make the text easier to understand:
+在极少数情况下，cherry picks 功能可能无效。发生这种情况时，自动化程序将在原始 PR 中留下一条注释，表明它已失败。发生这种情况时，您将需要手动创建 cherry pick，并处理阻止该过程自动运行的合并问题。
 
-    ```suggestion
+请注意，我们只会在当前版本的 Release 分支中应用更改，而不会在旧版本中进行。较旧的分支被视为已归档，并且通常不再接收任何更改。
 
-    Pilot maintains an abstract model of the mesh.
+## Istio 社区角色{#Istio-community-roles}
 
-    ```
-    {{< /text >}}
+根据您的贡献和责任，您可以扮演多个角色。
 
-1. 发表评审结果之后，在 PR 中加入回复 `/hold cancel`，将会解锁 PR，允许合并。
+访问我们的[社区角色页面](https://github.com/istio/community/blob/master/ROLES.md#role-summary)，在此页面您可以了解角色、相关的要求和职责以及与角色相关联的特权。
 
-## 预览您的成果
-
-当您提交 Pull request 时，GitHub 上的 PR 页面会显示一个链接，指向您的 PR 自动构建的临时站点。这有助于您查看面向最终用户的页面。审核您 Pull request 的人也使用此临时站点，当一切看起来没有问题时才准许合并。
-
-如果您创建了存储库的分支，则可以在本地预览更改。有关说明，请参阅 [README](https://github.com/istio/istio.io/blob/master/README.md)。
-
-## Istio 社区的角色
-
-根据每个人的职责和贡献，社区中存在多种角色。
-
-[角色概览页面](https://github.com/istio/community/blob/master/ROLES.md#role-summary)中介绍了各种角色的要求和责任，及其所具备的权限。
-
-[社区页面](https://github.com/istio/community)中对 Istio 社区进行了简单的介绍。
+访问我们的[社区](https://github.com/istio/community)，您可以全面了解有关 Istio 社区的更多信息。

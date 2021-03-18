@@ -4,6 +4,7 @@ description: How to export Istio Access Logs to different sinks like BigQuery, G
 publishdate: 2018-07-09
 subtitle:
 attribution: Nupur Garg and Douglas Reid
+target_release: 0.8
 ---
 
 This post shows how to direct Istio logs to [Stackdriver](https://cloud.google.com/stackdriver/)
@@ -21,7 +22,7 @@ application throughout this task.
 
 ## Configuring Istio to export logs
 
-Istio exports logs using the `logentry` [template](/docs/reference/config/policy-and-telemetry/templates/logentry).
+Istio exports logs using the `logentry` [template](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/templates/logentry).
 This specifies all the variables that are available for analysis. It
 contains information like source service, destination service, auth
 metrics (coming..) among others. Following is a diagram of the pipeline:
@@ -67,7 +68,7 @@ Common setup for all sinks:
 ### Setting up Stackdriver
 
 A Stackdriver handler must be created to export data to Stackdriver. The configuration for
-a Stackdriver handler is described [here](/docs/reference/config/policy-and-telemetry/adapters/stackdriver/).
+a Stackdriver handler is described [here](https://istio.io/v1.6/docs/reference/config/policy-and-telemetry/adapters/stackdriver/).
 
 1.  Save the following yaml file as `stackdriver.yaml`. Replace `<project_id>,
     <sink_id>, <sink_destination>, <log_filter>` with their specific values.
@@ -204,7 +205,7 @@ exported. In detail as follows:
       namespace: <your defined namespace>
     {{< /text >}}
 
-1.  Added logInfo in spec
+1.  Added `logInfo` in spec
 
     {{< text yaml >}}
     spec:

@@ -1,45 +1,38 @@
 ---
-title: 启用策略检查
-description: 本任务讲解如何启用 Istio 策略检查功能。
+title: 启用策略检查功能 
+description: 这个任务将告诉你如何开启 Istio 的策略检查功能。
 weight: 1
 keywords: [policies]
 ---
 
-本任务讲解如何启用 Istio 策略检查功能。
+这个任务将告诉你如何开启 Istio 的策略检查功能。
 
-## 对于初始安装
+## 安装阶段{#at-install-time}
 
-在 Istio 默认的安装配置中，策略检查是被禁用的。
-要安装启用策略检查功能的 Istio，请使用 `--set global.disablePolicyChecks=false` Helm 安装选项。
+在默认的 Istio 安装配置中，策略检查功能是关闭的。若要开启策略检查功能，需在安装选项中加入`--set values.global.disablePolicyChecks=false` 和 `--set values.pilot.policy.enabled=true`。
 
-或者，您也可以[使用演示配置安装 Istio](/docs/setup/install/kubernetes/)，这默认就启用了策略检查。
+或者，也可以[按示例配置安装 Istio](/zh/docs/setup/getting-started/)，其中策略检查功能已默认开启。
 
-## 对于已经存在的 Istio 网格
+## 对于已经安装的 Istio 网格{#for-an-existing-Istio-mesh}
 
-1. 检查网格的策略检查状态。
+1. 检查该网格中策略检查功能的状态。
 
     {{< text bash >}}
     $ kubectl -n istio-system get cm istio -o jsonpath="{@.data.mesh}" | grep disablePolicyChecks
     disablePolicyChecks: true
     {{< /text >}}
 
-    如果启用了策略检查，则不需要进一步的操作。
+    如果策略检查功能已开启（`disablePolicyChecks`置为 false），则无需再做什么。
 
-1. 编辑 `istio` configmap 以启用策略检查。
+1. 修改 `istio` configuration，开启策略检查功能。
 
-    {{< text bash >}}
-    $ kubectl -n istio-system get cm istio -o jsonpath="{@.data.mesh}" | sed -e "s/disablePolicyChecks: true/disablePolicyChecks: false/" > /tmp/mesh.yaml
-    $ kubectl -n istio-system create cm istio -o yaml --dry-run --from-file=mesh=/tmp/mesh.yaml | kubectl replace -f -
-    configmap "istio" replaced
-    {{< /text >}}
-
-1. 删除为修补 `istio` configmap 而创建的临时文件。
+    在 Istio 根目录执行以下指令：
 
     {{< text bash >}}
-    $ rm /tmp/mesh.yaml
+    $ istioctl manifest apply --set values.global.disablePolicyChecks=false --set values.pilot.policy.enabled=true configuration "istio" replaced
     {{< /text >}}
 
-1. 验证现在是否已经成功启用了策略检查。
+1. 验证策略检查功能是否已启用。
 
     {{< text bash >}}
     $ kubectl -n istio-system get cm istio -o jsonpath="{@.data.mesh}" | grep disablePolicyChecks

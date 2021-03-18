@@ -6,11 +6,11 @@ subtitle:
 attribution: Manish Chugtu
 twitter: chugtum
 keywords: [kubernetes,sidecar-injection, traffic-management]
-
+target_release: 1.0
 ---
 A simple overview of an Istio service-mesh architecture always starts with describing the control-plane and data-plane.
 
-[From Istio’s documentation:](/docs/concepts/what-is-istio/#architecture)
+[From Istio’s documentation](/docs/ops/deployment/architecture/):
 
 {{< quote >}}
 An Istio service mesh is logically split into a data plane and a control plane.
@@ -33,7 +33,7 @@ It is important to understand that the sidecar injection into the application po
 In simple terms, sidecar injection is adding the configuration of additional containers to the pod template. The added containers needed for the Istio service mesh are:
 
 `istio-init`
-This [init container] (<https://kubernetes.io/docs/concepts/workloads/pods/init-containers/>) is used to setup the `iptables` rules so that inbound/outbound traffic will go through the sidecar proxy. An init container is different than an app container in following ways:
+This [init container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) is used to setup the `iptables` rules so that inbound/outbound traffic will go through the sidecar proxy. An init container is different than an app container in following ways:
 
 - It runs before an app container is started and it always runs to completion.
 - If there are many init containers, each should complete with success before the next container is started.
@@ -306,7 +306,7 @@ This example shows there are many variables, based on whether the automatic side
 - default policy (Configured in the ConfigMap `istio-sidecar-injector`)
 - per-pod override annotation (`sidecar.istio.io/inject`)
 
-The [injection status table](/docs/ops/troubleshooting/injection/) shows a clear picture of the final injection status based on the value of the above variables.
+The [injection status table](/docs/ops/common-problems/injection/) shows a clear picture of the final injection status based on the value of the above variables.
 
 ## Traffic flow from application container to sidecar proxy
 

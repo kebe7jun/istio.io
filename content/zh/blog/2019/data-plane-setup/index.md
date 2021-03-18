@@ -1,60 +1,57 @@
 ---
-title: Istio Sidecar 注入过程解密
-description: Istio 将数据面组件注入到现存部署之中的过程。
+title: 揭开 Istio Sidecar 注入模型的神秘面纱
+description: 揭秘 Istio 是如何将其数据平面组件添加到现有 deployment。
 publishdate: 2019-01-31
 subtitle:
 attribution: Manish Chugtu
 twitter: chugtum
 keywords: [kubernetes,sidecar-injection, traffic-management]
-
+target_release: 1.0
 ---
+Istio 服务网格体系结构的简单概述总是从控制平面和数据平面开始。
 
-Istio 服务网格架构的概述，通常都是从对数据面和控制面的叙述开始的。
-
-[来自 Istio 的文档：](/zh/docs/concepts/what-is-istio/#架构)
+从 [Istio 的文档](/zh/docs/ops/deployment/architecture/) :
 
 {{< quote >}}
-Istio 服务网格逻辑上分为数据平面和控制平面。
+Istio 服务网格在逻辑上分为数据平面和控制平面。
 
-数据平面由一组以 sidecar 方式部署的智能代理（Envoy）组成。这些代理和 Mixer（一个通用的策略和遥测中心）合作，对所有微服务之间的之间所有的网络通信进行控制。
+数据平面由一组部署为 sidecar 的智能代理（Envoy）组成。这些代理与 Mixer、通用策略和遥测中心协调并控制微服务之间的所有网络通信。
 
-控制平面负责管理和配置代理来路由流量。此外控制平面配置 Mixer 以实施策略和收集遥测数据。
+控制平面管理并配置从代理到路由的流量。此外，控制平面配置 Mixer 以执行策略和收集遥测数据。
 {{< /quote >}}
 
 {{< image width="40%"
     link="./arch-2.svg"
-    alt="基于 Istio 的应用的总体架构。"
-    caption="Istio 架构"
+    alt="基于 Istio 的应用程序的总体架构。"
+    caption="Istio Architecture"
     >}}
 
-Sidecar 注入到应用的过程，可以是自动的，也可以是手动的，了解这一过程是很重要的。应用的流量会被重定向进入或流出 Sidecar，开发人员无需关心。应用接入 Istio 服务网格之后，开发者可以开始使用网格功能并从中受益。然而数据平面是如何工作的，以及需要怎样的条件才能完成这种无缝工作？本文中我们会深入到 Sidecar 注入模型中，来更清晰的了解 Sidecar 的注入过程。
+重要的是要理解向应用程序 pod 中注入边车是自动进行的，尽管也可以手动注入。流量从应用服务流向 sidecar，而开发人员无需关心它。一旦将应用程序连接到 Istio 服务网格，开发者便可以开始使用并获得服务网格中的所有效益。但是，数据平面管道是如何发生的，以及无缝迁移工作的真正要求是什么？在本文中，我们将深入研究 Sidecar 注入模型的细节，以非常清楚地理解 Sidecar 注入的工作原理。
 
-## Sidecar 注入
+## Sidecar 注入{#sidecar-injection}
 
-简单来说，注入 Sidecar 就是把附加的容器配置插入 Pod 模板的过程。Istio 服务网格所需的附加容器是：
+简单来说，Sidecar 注入会将额外容器的配置添加到 Pod 模板中。Istio 服务网格目前所需的容器有：
 
 `istio-init`
+[init 容器](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)用于设置 iptables 规则，以便将入站/出站流量通过 sidecar 代理。初始化容器与应用程序容器在以下方面有所不同：
 
-这个[初始化容器](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)用于设置 `iptables` 规则，让出入流量都转由 Sidecar 进行处理。和应用容器相比，初始化容器有几点不同：
+- 它在启动应用容器之前运行，并一直运行直至完成。
+- 如果有多个初始化容器，则每个容器都应在启动下一个容器之前成功完成。
 
-- 它在应用容器之前启动，并且会运行到结束。
-- 如果有多个初始化容器，只有在前一个初始化容器成功结束之后才会启动下一个。
-
-不看看出，这种容器是非常适合执行启动或者初始化任务的，并且也无需和实际的应用容器集成到一起。`istio-init` 只是用来设置 `iptables` 的规则。
+因此，您可以看到，对于不需要成为实际应用容器一部分的设置或初始化作业来说，这种容器是多么的完美。在这种情况下，`istio-init` 就是这样做并设置了 `iptables` 规则。
 
 `istio-proxy`
+这个容器是真正的 sidecar 代理（基于 Envoy）。
 
-这个容器是真正的 Sidecar（基于 Envoy）。
+### 手动注入{#manual-injection}
 
-### 手工注入
+在手动注入方法中，可以使用 [`istioctl`](/zh/docs/reference/commands/istioctl) 修改容器模板并添加前面提到的两个容器的配置。不论是手动注入还是自动注入，Istio 都从 `istio-sidecar-injector` 和的 `istio` 两个 Configmap 对象中获取配置。
 
-要进行手工注入，只要用 `istioctl` 把前面提到的两个容器定义加入到 Pod 的模板之中即可。不论是手工注入还是自动注入，都是从 `istio-sidecar-injector` 以及 `istio` 两个 Configmap 对象中获取配置的。
-
-我们先来看看 `istio-sidecar-injector` Configmap，了解一下其中的内容。
+我们先来看看 `istio-sidecar-injector` Configmap 的配置，了解一下其中的内容。
 
 {{< text bash yaml>}}
 $ kubectl -n istio-system get configmap istio-sidecar-injector -o=jsonpath='{.data.config}'
-部分输出内容：
+以下代码片段来自 output：
 
 policy: enabled
 template: |-
@@ -100,11 +97,11 @@ template: |-
     .....
 {{< /text >}}
 
-如你所见，这个 Configmap 中包含了前面提到的两个容器的配置内容：`istio-init` 初始化容器以及 `istio-proxy` 代理容器。配置中包含了容器镜像名称以及一些参数，例如拦截模式，权限要求等。
+如您所见，configmap 包含了 `istio-init` 初始化容器和 `istio-proxy` 代理容器的配置。该配置包括容器镜像的名称以及拦截模式，权限要求等参数。
 
-从安全角度看来，要注意 `istio-init` 需要 `NET_ADMIN` 权限，以便在 Pod 的命名空间中修改 `iptables`；如果 `istio-proxy` 设置为 `TPROXY` 模式，也会需要这一权限。这一权限是限制在 Pod 的命名空间之内的，这应该没问题。然而我注意到最近的 open-shift 版本好像在这方面有点问题，需要进一步确认。这方面的选项会在文末继续讨论。
+从安全的角度来看，重要的是要注意 `istio-init` 需要 `NET_ADMIN` 权限来修改 pod 命名空间中的 `iptables`，如果 `istio-proxy` 是 `TPROXY` 模式，也需要这一权限。由于该仅限于 pod 的命名空间，因此应该没有问题。但是，我们注意到最近的 open-shift 版本可能会出现一些问题，因此需要一种解决方法。本文结尾处提到了一个这样的选择。
 
-要修改当前的 Pod 模板来进行注入，可以：
+要修改当前的 Pod 模板以进行 sidecar 注入，您可以：
 
 {{< text bash >}}
 $ istioctl kube-inject -f demo-red.yaml | kubectl apply -f -
@@ -112,39 +109,39 @@ $ istioctl kube-inject -f demo-red.yaml | kubectl apply -f -
 
 或者
 
-想要使用修改过的 Configmap 或者本地 Configmap：
+要使用修改后的 Configmap 或本地 Configmap：
 
-- 从 Configmap 中创建 `inject-config.yaml` and `mesh-config.yaml`：
+- 从 configmap 创建 `inject-config.yaml` 和 `mesh-config.yaml`
 
     {{< text bash >}}
 $ kubectl -n istio-system get configmap istio-sidecar-injector -o=jsonpath='{.data.config}' > inject-config.yaml
 $ kubectl -n istio-system get configmap istio -o=jsonpath='{.data.mesh}' > mesh-config.yaml
     {{< /text >}}
 
-- 修改现存的 Pod 模板，这里假设文件名为 `demo-red.yaml`：
+- 修改现有的 pod 模板，在这个例子中是，`demo-red.yaml`：
 
     {{< text bash >}}
 $ istioctl kube-inject --injectConfigFile inject-config.yaml --meshConfigFile mesh-config.yaml --filename demo-red.yaml --output demo-red-injected.yaml
     {{< /text >}}
 
-- 提交 `demo-red-injected.yaml`：
+- 提交 `demo-red-injected.yaml`
 
     {{< text bash >}}
 $ kubectl apply -f demo-red-injected.yaml
     {{< /text >}}
 
-上面的几个步骤中，我们使用 `sidecar-injector` 以及 `istio` 两个 Configmap 的内容修改了 Pod 模板并使用 `kubectl` 命令进行了提交。如果查看一下注入后的 YAML 文件，会看到前面讨论过的 Istio 的专属容器，提交到集群上之后，会看到两个容器在运行：一个是实际的应用容器，另一个则是 `istio-proxy` Sidecar。
+如上所示，我们使用 `sidecar-injector` 和网格配置创建了一个新模板，然后使用 `kubectl` 应用该新模板。如果我们查看注入后的 YAML 文件，它具有 Istio 特定容器的配置，如上所述。一旦我们应用注入后的 YAML 文件，我们将看到两个容器正在运行。其中一个是实际的应用程序容器，另一个是 `istio-proxy` sidecar。
 
 {{< text bash >}}
     $ kubectl get pods | grep demo-red
     demo-red-pod-8b5df99cc-pgnl7   2/2       Running   0          3d
 {{< /text >}}
 
-这里没有 3 个 Pod，这是因为 `istio-init` 容器是一个初始化容器，它完成任务之后就会退出——他的任务就是设置 Pod 内的 `iptables` 规则。要确认退出的初始化容器，可以看看 `kubectl describe` 的输出：
+这里没有 3 个 Pod，因为 `istio-init` 容器是一个 init 类型的容器，它在完成应做的操作后退出，其用于在 pod 中设置 `iptable` 规则。为了确认 init 容器已退出，让我们看一下 `kubectl describe` 的输出：
 
 {{< text bash yaml>}}
 $ kubectl describe pod demo-red-pod-8b5df99cc-pgnl7
-SNIPPET from the output:
+以下代码片段来自 output：
 
 Name:               demo-red-pod-8b5df99cc-pgnl7
 Namespace:          default
@@ -188,13 +185,13 @@ Containers:
     .....
 {{< /text >}}
 
-从上文的输出可以看出，`istio-init` 容器的 `State` 字段值为 `Terminated`，`Reason` 是 `Completed`。正在运行的两个 Pod 是应用容器 `demo-red` 以及 `istio-proxy`。
+从输出中可以看出，`istio-init` 容器的 `State` 为 `Terminated`，而 `Reason` 是 `Completed`。只有两个容器是运行的，主应用程序 `demo-red` 容器和 `istio-proxy` 容器。
 
-### 自动注入
+### 自动注入{#automatic-injection}
 
-多数时候，用户不想在每次部署应用的时候都用 `istioctl` 命令进行手工注入，这时候就可以使用 Istio 的自动注入功能来应对了。只要给用于部署应用的命名空间打个 `istio-injection=enabled` 标签就可以了。
+在大多数情况下，您不想在每次部署应用程序时都使用 [`istioctl`](/zh/docs/reference/commands/istioctl) 命令手动注入边车，而是希望 Istio 自动将 sidecar 注入到您的 pod 中。这是推荐的方法，要使自动注入生效，您只需要用 `istio-injection=enabled` 标记想部署应用程序的命名空间。
 
-打上标签之后，这个命名空间中新建的任何 Pod 都会被 Istio 注入 Sidecar。下面的例子里，`istio-dev` 命名空间中部署的 Pod 被自动注入了 Sidecar：
+贴上标签后，Istio 会自动为您在该命名空间中部署的所有 pod 注入 sidecar。下面的例子里，`istio-dev` 命名空间中部署的 pod 被自动注入了 sidecar：
 
 {{< text bash >}}
 $ kubectl get namespaces --show-labels
@@ -206,19 +203,19 @@ kube-public    Active    40d       <none>
 kube-system    Active    40d       <none>
 {{< /text >}}
 
-这是怎么完成的呢？要回答这一问题，首先要了解一下 Kubernetes 的准入控制器。
+但它是如何工作的呢？要深入了解这一点，我们需要理解 Kubernetes 准入控制器。
 
-[来自 Kubernetes 文档](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)
+[来自 Kubernetes 文档：](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)
 
 {{< tip >}}
-准入控制器是一段代码，会拦截 Kubernetes API Server 收到的请求，拦截发生在认证和鉴权完成之后，对象进行持久化之前。可以定义两种类型的 Admission webhook：Validating 和 Mutating。Validating 类型的 Webhook 可以根据自定义的准入策略决定是否拒绝请求；Mutating 类型的 Webhook 可以根据自定义配置来对请求进行编辑。
+准入控制器是一段代码，用于在对象持久化之前但请求已经过身份验证和授权之后，拦截对 Kubernetes API 服务器的请求。您可以定义两种类型的 Admission Webhook：Validating 和 Mutating。Validating 类型的 Webhook 可以根据自定义的准入策略决定是否拒绝请求；Mutating 类型的 Webhook 可以根据自定义配置来对请求进行编辑。
 {{< /tip >}}
 
-Istio 的自动注入过程中会依赖 Mutating webhook。我们看看 `istio-sidecar-injector` 中的配置详情：
+对于 sidecar 自动注入，Istio 依赖于 `Mutating Admission Webhook`。让我们来看看 `istio-sidecar-injector` 中的配置详情。
 
 {{< text bash yaml >}}
 $ kubectl get mutatingwebhookconfiguration istio-sidecar-injector -o yaml
-输出内容节选:
+以下代码片段来自 output：
 
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
@@ -256,22 +253,22 @@ webhooks:
     - pods
 {{< /text >}}
 
-这里可以看到一个 `namespaceSelector`，其中的定义表明它的工作是针对带有 `istio-injection: enabled` 标签的命名空间的。这种情况下，你还会看到 Pod 创建期间进行注入时的一些其它工作和相关资源的内容。当 `apiserver` 收到一个符合规则的请求时，`apiserver` 会给 Webhook 服务发送一个准入审核的请求，Webhook 服务的定义包含在 `clientConfig` 配置中的 `name: istio-sidecar-injector` 字段里。我们会看到，这个服务正在 `istio-system` 命名空间里运行。
+在这里，您可以看到与标签 `istio-injection:enabled` 相匹配的 webhook `namespaceSelector` 标签。在这种情况下，您还会看到在创建容器时要完成的操作和资源。当 `apiserver` 接收到与其中一个规则匹配的请求时，`apiserver` 会根据 `clientconfig` 配置中指定的 `name: istio-sidecar-injector` 键值对，向 webhook 服务发送准入审查请求。我们应该能够看到该服务正在 `istio-system` 命名空间中运行。
 
 {{< text bash >}}
 $ kubectl get svc --namespace=istio-system | grep sidecar-injector
 istio-sidecar-injector   ClusterIP   10.102.70.184   <none>        443/TCP             24d
 {{< /text >}}
 
-这个配置总体上来说，完成了我们手工注入所需完成的工作。只不过是它是在 Pod 创建的过程中自动完成的，所以你也不会看到 Deployment 对象发生了任何变化。可以用 `kubectl describe` 命令来查看 Sidecar 和初始化容器。如果想要修改注入逻辑，例如 Istio 自动注入的生效范围，可以编辑 `MutatingWebhookConfiguration`，然后重启 Sidecar injector Pod。
+最终，该配置与手动注入中的配置几乎相同。只是它是在 pod 创建过程中自动完成的，因此您不会看到部署中的更改。您需要使用 `kubectl describe` 来查看 sidecar 代理和 init 代理。
 
-Sidecar 的自动注入过程除了根据 `namespaceSelector` 选择命名空间之外，还受到缺省注入策略以及 Pod 自身注解的影响。
+sidecar 自动注入不仅取决于 webhook 的 `namespaceSelector` 机制，还取决于默认注入策略和每个 pod 自身注解。
 
-再看看 `istio-sidecar-injector` ConfigMap 中的缺省策略定义。可以看到，缺省是启用的。
+如果你再次查看 `istio-sidecar-injector` ConfigMap，它将定义默认的注入策略。在这个示例中，它是默认启用的。
 
 {{< text bash yaml>}}
 $ kubectl -n istio-system get configmap istio-sidecar-injector -o=jsonpath='{.data.config}'
-SNIPPET from the output:
+以下代码片段来自 output：
 
 policy: enabled
 template: |-
@@ -283,7 +280,7 @@ template: |-
     - [[ .MeshConfig.ProxyListenPort ]]
 {{< /text >}}
 
-还可以在 Pod 模板中使用注解 `sidecar.istio.io/inject` 覆盖缺省策略。下面的例子中的 `Deployment` 用这种方式禁用了自动注入：
+您还可以在 pod 模板中使用注解 `sidecar.istio.io/inject` 覆盖默认策略。以下示例展示如何为 `Deployment` 中的 pod 禁用 sidecar 自动注入。
 
 {{< text yaml>}}
 apiVersion: extensions/v1beta1
@@ -303,19 +300,19 @@ spec:
 
 {{< /text >}}
 
-这个例子展示了很多可能性，可以从命名空间标签、ConfigMap 或者 Pod 中分别进行控制：
+此示例显示了许多变量，这取决于是否在命名空间、ConfigMap 和 pod 中控制 sidecar 自动注入，它们是：
 
-- Webhooks 定义中的 `namespaceSelector`（`istio-injection: enabled`）
-- 缺省策略（在 ConfigMap `istio-sidecar-injector` 中定义）
-- Pod 注解（`sidecar.istio.io/inject`）
+- webhook `namespaceSelector`（`istio-injection: enabled`）
+- 默认策略（在 ConfigMap `istio-sidecar-injector` 中配置）
+- 每个 pod 的重载注解（`sidecar.istio.io/inject`）
 
-[注入状态表](/zh/docs/ops/setup/injection/)中，根据上面三个因素的不同，可以看到有不同的注入结果。
+[注入状态表](/zh/docs/ops/common-problems/injection/)根据上述变量的值清晰显示了最终注入状态。
 
-## 从应用容器到 Sidecar 代理的通信
+## 从应用容器到 Sidecar 代理的流量{#traffic-flow-from-application-container-to-sidecar-proxy}
 
-现在我们知道了 Sidecar 容器和初始化容器被注入到应用中的过程了，Sidecar 代理是如何截获进出容器的流量呢？我们前面提到过，这是通过对 Pod 命名空间中 `iptable` 规则的设置来完成的，这个设置过程由 `istio-init` 容器来控制。现在可以看看命名空间中到底更新了些什么。
+既然我们已经清楚了如何将 sidecar 容器和 init 容器注入到应用清单中，那么 sidecar 代理如何捕获容器之间的入站和出站流量？我们曾简要提到过，这是通过在 pod 命名空间中设置 `iptable` 规则来完成的，而规则又是由 `istio-init` 容器完成的。现在，是时候验证命名空间中实际更新的内容了。
 
-进入前面我们部署的应用 Pod 的命名空间，看看配置完成的 iptables。我会使用 `nsenter`。也可以用特权模式进入容器获得同样的信息。如果无法访问节点，可以用 `exec` 进入 Sidecar 来执行 `iptables` 指令。
+让我们进入上一节中部署的应用程序 pod 命名空间，并查看已配置的 iptables。我们将展示一个使用 `nsenter` 的例子。或者，您也可以通过特权模式进入容器并查看相同的信息。对于无法访问节点的人来说，使用 `exec` 进入 sidecar 并运行 `iptables` 更实用。
 
 {{< text bash >}}
 $ docker inspect b8de099d3510 --format '{{ .State.Pid }}'
@@ -344,10 +341,10 @@ $ nsenter -t 4215 -n iptables -t nat -S
 -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-ports 15001
 {{< /text >}}
 
-上面展示的内容中，可以清楚的看到，所有从 80 端口（`red-demo` 应用监听的端口）进入的流量，被 `REDIRECTED` 到了端口 `15001`，这是 `istio-proxy`（Envoy 代理）监听的端口。外发流量也是如此。
+上面的输出清楚地表明，端口 80 的所有入站流量（即我们的 `red-demo` 应用正在监听的端口）现在已被 `REDIRECTED` 到端口 15001，即 `istio-proxy` 的端口，一个 Envoy 代理正在监听的端口。对于出站流量也是如此。
 
-本文进入尾声。希望能够让读者了解到 Istio 将 Sidecar 注入到 Pod 中的过程，以及 Istio 将流量路由到代理服务器的过程。
+本文已经快结束了。我们希望本文有助于您弄清 Istio 是如何将 Sidecar 代理注入到现有部署中以及 Istio 是如何将流量路由到代理。
 
 {{< idea >}}
-更新：在 `istio-init` 阶段，现在有了一个新的使用 CNI 的方式，这种方式无需初始化容器的帮助，也不需要对应的权限。[`istio-cni`](https://github.com/istio/cni) 插件会设置 Pod 的网络来满足这一要求，可以代替 `istio-init` 来完成任务。
+更新：现在似乎可以选择使用新的 CNI 来代替 `istio-init`，其移除了对 init 容器和相关特权的要求。[`istio-cni`](https://github.com/istio/cni) 插件设置了 pod 的网络来满足此要求，以代替 Istio 当前通过 `istio-init` 注入 pod 的方法。
 {{< /idea >}}

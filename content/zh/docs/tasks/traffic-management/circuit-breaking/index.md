@@ -1,42 +1,32 @@
 ---
 title: 熔断
-description: 用连接、请求以及外部检测来进行熔断配置的过程。
+description: 本任务展示如何为连接、请求以及异常检测配置熔断。
 weight: 50
 keywords: [traffic-management,circuit-breaking]
 ---
 
-本任务展示了用连接、请求以及外部检测来进行熔断配置的过程。
+本任务展示如何为连接、请求以及异常检测配置熔断。
 
-断路器是创建弹性微服务应用程序的重要模式。断路器允许您编写限制故障、延迟峰值以及其他不良网络特性影响的应用程序。
+熔断，是创建弹性微服务应用程序的重要模式。熔断能够使您的应用程序具备应对来自故障、潜在峰值和其他
+未知网络因素影响的能力。
 
-在此任务中，您将配置断路器规则，然后通过故意“跳闸”断路器来测试配置。
+这个任务中，你将配置熔断规则，然后通过有意的使熔断器“跳闸”来测试配置。
 
-## 开始之前
+## 开始之前{#before-you-begin}
 
-* 跟随[安装指南](/zh/docs/setup) 设置 Istio。
+* 跟随[安装指南](/zh/docs/setup/)安装 Istio。
 
-* 启动 [httpbin]({{< github_tree >}}/samples/httpbin) 示例应用，这个应用将会作为本任务的后端服务。
+{{< boilerplate start-httpbin-service >}}
 
-    如果启用了 [Sidecar 的自动注入](/zh/docs/setup/kubernetes/additional-setup/sidecar-injection/#sidecar-的自动注入)，只需运行：
+应用程序 `httpbin` 作为此任务的后端服务。
 
-    {{< text bash >}}
-    $ kubectl apply -f @samples/httpbin/httpbin.yaml@
-    {{< /text >}}
+## 配置熔断器{#configuring-the-circuit-breaker}
 
-    否则就需要在部署 `httpbin` 应用之前手工注入 Sidecar 了：
-
-    {{< text bash >}}
-    $ kubectl apply -f <(istioctl kube-inject -f @samples/httpbin/httpbin.yaml@)
-    {{< /text >}}
-
-    `httpbin` 应用程序用作为此任务的后端服务。
-
-## 断路器
-
-1. 创建一个 [目标规则](/zh/docs/reference/config/istio.networking.v1alpha3/#destinationrule)，针对 `httpbin` 服务设置断路器：
+1. 创建一个[目标规则](/zh/docs/reference/config/networking/destination-rule/)，在调用 `httpbin`
+服务时应用熔断设置：
 
     {{< warning >}}
-    如果您的 Istio 启用了双向 TLS 身份验证，则必须在应用之前将 TLS 流量策略 `mode：ISTIO_MUTUAL` 添加到 `DestinationRule`。否则请求将产生 503 错误，如[设置目标规则后出现 503 错误](/zh/docs/ops/traffic-management/troubleshooting/#设置目标规则后出现-503-错误)所述。
+    如果您的 Istio 启用了双向 TLS 身份验证，则必须在应用目标规则之前将 TLS 流量策略 `mode：ISTIO_MUTUAL` 添加到 `DestinationRule` 。否则请求将产生 503 错误，如[这里](/zh/docs/ops/common-problems/network-issues/#service-unavailable-errors-after-setting-destination-rule)所述。
     {{< /warning >}}
 
     {{< text bash >}}
@@ -62,7 +52,7 @@ keywords: [traffic-management,circuit-breaking]
     EOF
     {{< /text >}}
 
-1. 检查我们的目标规则，确定已经正确建立：
+1. 验证目标规则是否已正确创建：
 
     {{< text bash yaml >}}
     $ kubectl get destinationrule httpbin -o yaml
@@ -87,17 +77,19 @@ keywords: [traffic-management,circuit-breaking]
           maxEjectionPercent: 100
     {{< /text >}}
 
-### 设置客户端
+## 增加一个客户{#adding-a-client}
 
-现在我们已经设置了调用 `httpbin` 服务的规则，接下来创建一个客户端，用来向后端服务发送请求，观察是否会触发熔断策略。这里要使用一个简单的负载测试客户端，名字叫 [fortio](https://github.com/istio/fortio)。这个客户端可以控制连接数量、并发数以及发送 HTTP 请求的延迟。使用这一客户端，能够有效的触发前面在目标规则中设置的熔断策略。
+创建客户端程序以发送流量到 `httpbin` 服务。这是一个名为 [Fortio](https://github.com/istio/fortio)
+的负载测试客户的，其可以控制连接数、并发数及发送 HTTP 请求的延迟。通过 Fortio 能够有效的触发前面
+在 `DestinationRule` 中设置的熔断策略。
 
-1. 这里我们会把给客户端也进行 Sidecar 的注入，以此保证 Istio 对网络交互的控制：
+1. 向客户端注入 Istio Sidecar 代理，以便 Istio 对其网络交互进行管理：
 
     {{< text bash >}}
     $ kubectl apply -f <(istioctl kube-inject -f @samples/httpbin/sample-client/fortio-deploy.yaml@)
     {{< /text >}}
 
-1. 接下来就可以登入客户端 Pod 并使用 Fortio 工具来调用 `httpbin`。`-curl` 参数表明只调用一次：
+1. 登入客户端 Pod 并使用 Fortio 工具调用 `httpbin` 服务。`-curl` 参数表明发送一次调用：
 
     {{< text bash >}}
     $ FORTIO_POD=$(kubectl get pod | grep fortio | awk '{ print $1 }')
@@ -128,16 +120,18 @@ keywords: [traffic-management,circuit-breaking]
     }
     {{< /text >}}
 
-    不难看出，调用已经成功。接下来做些变化。
+可以看到调用后端服务的请求已经成功！接下来，可以测试熔断。
 
-## 触发熔断机制
+## 触发熔断器{#tripping-the-circuit-breaker}
 
-在上面的熔断设置中指定了 `maxConnections: 1` 以及 `http1MaxPendingRequests: 1`。这意味着如果超过了一个连接同时发起请求，Istio 就会熔断，阻止后续的请求或连接。
+在 `DestinationRule` 配置中，您定义了 `maxConnections: 1` 和 `http1MaxPendingRequests: 1`。
+这些规则意味着，如果并发的连接和请求数超过一个，在 `istio-proxy` 进行进一步的请求和连接时，后续请求或
+连接将被阻止。
 
-1. 接下来尝试一下两个并发连接（`-c 2`），发送 20 请求（`-n 20`）：
+1. 发送并发数为 2 的连接（`-c 2`），请求 20 次（`-n 20`）：
 
     {{< text bash >}}
-    $ kubectl exec -it $FORTIO_POD  -c fortio /usr/bin/fortio -- load -c 2 -qps 0 -n 20 -loglevel Warning http://httpbin:8000/get
+    $ kubectl exec -it $FORTIO_POD  -c fortio -- /usr/bin/fortio load -c 2 -qps 0 -n 20 -loglevel Warning http://httpbin:8000/get
     Fortio 0.6.2 running at 0 queries per second, 2->2 procs, for 5s: http://httpbin:8000/get
     Starting at max qps with 2 thread(s) [gomax 2] for exactly 20 calls (10 per thread + 0)
     23:51:10 W http.go:617> Parsed non ok code 503 (HTTP/1.1 503)
@@ -165,17 +159,17 @@ keywords: [traffic-management,circuit-breaking]
     All done 20 calls (plus 0 warmup) 10.215 ms avg, 187.8 qps
     {{< /text >}}
 
-    这里可以看到，几乎所有请求都通过了。Istio-proxy 允许存在一些误差。
+    有趣的是，几乎所有的请求都完成了！`istio-proxy` 确实允许存在一些误差。
 
     {{< text plain >}}
     Code 200 : 19 (95.0 %)
     Code 503 : 1 (5.0 %)
     {{< /text >}}
 
-1. 接下来把并发连接数量提高到 3：
+1. 将并发连接数提高到 3 个：
 
     {{< text bash >}}
-    $ kubectl exec -it $FORTIO_POD  -c fortio /usr/bin/fortio -- load -c 3 -qps 0 -n 30 -loglevel Warning http://httpbin:8000/get
+    $ kubectl exec -it $FORTIO_POD  -c fortio -- /usr/bin/fortio load -c 3 -qps 0 -n 30 -loglevel Warning http://httpbin:8000/get
     Fortio 0.6.2 running at 0 queries per second, 2->2 procs, for 5s: http://httpbin:8000/get
     Starting at max qps with 3 thread(s) [gomax 2] for exactly 30 calls (10 per thread + 0)
     23:51:51 W http.go:617> Parsed non ok code 503 (HTTP/1.1 503)
@@ -215,34 +209,34 @@ keywords: [traffic-management,circuit-breaking]
     All done 30 calls (plus 0 warmup) 5.336 ms avg, 422.2 qps
     {{< /text >}}
 
-    这时候会观察到，熔断行为按照之前的设计生效了，只有 63.3% 的请求获得通过，剩余请求被断路器拦截了：
+    现在，您将开始看到预期的熔断行为，只有 63.3% 的请求成功，其余的均被熔断器拦截：
 
     {{< text plain >}}
     Code 200 : 19 (63.3 %)
     Code 503 : 11 (36.7 %)
     {{< /text >}}
 
-1. 我们可以查询 `istio-proxy` 的状态，获取更多相关信息：
+1. 查询 `istio-proxy` 状态以了解更多熔断详情:
 
     {{< text bash >}}
-    $ kubectl exec -it $FORTIO_POD  -c istio-proxy  -- sh -c 'curl localhost:15000/stats' | grep httpbin | grep pending
+    $ kubectl exec $FORTIO_POD -c istio-proxy -- pilot-agent request GET stats | grep httpbin | grep pending
     cluster.outbound|80||httpbin.springistio.svc.cluster.local.upstream_rq_pending_active: 0
     cluster.outbound|80||httpbin.springistio.svc.cluster.local.upstream_rq_pending_failure_eject: 0
     cluster.outbound|80||httpbin.springistio.svc.cluster.local.upstream_rq_pending_overflow: 12
     cluster.outbound|80||httpbin.springistio.svc.cluster.local.upstream_rq_pending_total: 39
     {{< /text >}}
 
-    `upstream_rq_pending_overflow`  的值是 `12`，说明有 `12` 次调用被标志为熔断。
+    可以看到 `upstream_rq_pending_overflow` 值 `12`，这意味着，目前为止已有 12 个调用被标记为熔断。
 
-## 清理
+## 清理{#cleaning-up}
 
-1. 清理规则：
+1. 清理规则:
 
     {{< text bash >}}
     $ kubectl delete destinationrule httpbin
     {{< /text >}}
 
-1. 关闭 [httpbin]({{< github_tree >}}/samples/httpbin) 服务和客户端：
+1. 下线 [httpbin]({{< github_tree >}}/samples/httpbin) 服务和客户端：
 
     {{< text bash >}}
     $ kubectl delete deploy httpbin fortio-deploy

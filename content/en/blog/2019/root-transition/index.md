@@ -4,6 +4,7 @@ description: Learn how to extend the lifetime of Istio self-signed root certific
 publishdate: 2019-06-07
 attribution: Oliver Liu
 keywords: [security, PKI, certificate, Citadel]
+target_release: 1.1
 ---
 
 Istio self-signed certificates have historically had a 1 year default lifetime.
@@ -12,7 +13,7 @@ you need to schedule regular root transitions before they expire.
 An expiration of a root certificate may lead to an unexpected cluster-wide outage.
 The issue affects new clusters created with versions up to 1.0.7 and 1.1.7.
 
-See [Extending Self-Signed Certificate Lifetime](/docs/ops/security/root-transition/) for
+See [Extending Self-Signed Certificate Lifetime](https://istio.io/v1.7/docs/ops/configuration/security/root-transition/) for
 information on how to gauge the age of your certificates and how to perform rotation.
 
 {{< tip >}}

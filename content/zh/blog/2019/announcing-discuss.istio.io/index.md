@@ -1,19 +1,20 @@
 ---
-title: 宣布 discuss.istio.io
-subtitle: Istio 讨论板
-description: Istio 推出新的讨论板。
+title: Istio 论坛成立
+subtitle: Istio 问题讨论区
+description: Istio 有了一个新的论坛。
 publishdate: 2019-01-10
-attribution: The Istio Team
+aliases:
+    - /zh/news/2019/announcing-discuss.istio.io
 ---
 
-Istio 社区一直致力于为用户寻找与社区成员互动的最佳媒介——提出问题、互帮互助、与项目开发人员互动等。
+我们在 Istio 论坛中一直努力寻找合适的方法，让用户与论坛的其他成员进行互动、交流，寻求其他用户的帮助，以及与该项目的开发者进行沟通。
 
-我们尝试了几种方式，但每种方式都有些缺点。我们最近尝试的是 RocketChat，但它缺乏某些功能（例如分线程），这意味着它不适合针对单个问题做长时间的讨论。这还导致一些用户陷入两难境地——到底什么时候发邮件到  istio-users@googlegroups.com，什么时候使用 RocketChat？
+我们尝试了几种不同的途径，但是每种途径都有一些不足。RocketChat 是我们最近的工作，但是缺少某些功能（例如，线程方面），意味着它不再适合围绕任何单一问题进行讨论。这也给一些用户带来了困惑：什么时候应该向 `istio-users@googlegroups.com` 发送电子邮件，什么时候又该使用 RocketChat ？
 
-我们高兴地宣布 [discuss.istio.io](https://discuss.istio.io)，我们认为在这个单一平台上找到了很好的功能平衡。这是一个功能齐全的论坛，我们将从这里开始讨论 Istio。它将允许您提出问题并获得分线程回复！更棒的是您可以使用 GitHub 身份登录。
+我们认为我们已经在单一的平台上找到了正确平衡功能，因此我们很高兴地宣布 [discuss.istio.io](https://discuss.istio.io) 论坛成立啦。这是一个功能全面的论坛，我们将从这里开始对 Istio 进行讨论沟通，它允许你提出问题并获得主题回复！真正的好处是，你可以使用你的 GitHub 身份进行这些操作。
 
-如果您更喜欢电子邮件，则可以将其配置为像 Google group 一样发送电子邮件。
+如果你喜欢使用电子邮件，那么你可以将其配置为用电子邮件去发送，就像 Google groups 一样。
 
-我们会将 Google group 标记为 “read only”，以便保留内容，但我们会要求您将更多问题发送至 [discuss.istio.io](https://discuss.istio.io)。如果您在小组中有任何未解决的问题或讨论，请转移到讨论板。
+我们会将 Google groups 标记为 “只读”，以便保留其原始内容，但是请你发送进一步的问题到 [discuss.istio.io](https://discuss.istio.io) 。如果在你的小组中有任何未解决的问题或讨论，请结束讨论。
 
 Happy meshing!

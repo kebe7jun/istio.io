@@ -5,19 +5,20 @@ subtitle: 自定义 Ingress 网关
 publishdate: 2019-01-10
 keywords: [ingress,traffic-management]
 attribution: Julien Senon
+target_release: 1.0
 ---
 
-本文介绍了手工创建自定义 Ingress [Gateway](/docs/reference/config/networking/v1alpha3/gateway/) 的过程，其中使用 cert-manager 完成了证书的自动管理。
+本文介绍了手工创建自定义 Ingress [Gateway](/zh/docs/reference/config/networking/gateway/) 的过程，其中使用 cert-manager 完成了证书的自动管理。
 
 自定义 Ingress 网关在使用不同负载均衡器来隔离通信的情况下很有帮助。
 
-## 开始之前 {#before you begin}
+## 开始之前{#before-you-begin}
 
 * 根据[安装指南](/zh/docs/setup/)完成 Istio 的部署。
 * 用 Helm [Chart](https://github.com/helm/charts/tree/master/stable/cert-manager#installing-the-chart) 部署 `cert-manager`。
 * 我们会使用 `demo.mydemo.com` 进行演示，因此你的 DNS 解析要能够解析这个域名。
 
-## 配置自定义 Ingress 网关 {#configuring-the-custom-ingress-gateway}
+## 配置自定义 Ingress 网关{#configuring-the-custom-ingress-gateway}
 
 1. 用下面的 `helm` 命令检查 [cert-manager](https://github.com/helm/charts/tree/master/stable/cert-manager) 是否已经完成部署：
 
@@ -36,7 +37,7 @@ attribution: Julien Senon
 1. 要创建集群的证书签发者，可以使用如下的配置：
 
     {{< tip >}}
-    用自己的配置修改集群的[证书签发者](https://cert-manager.readthedocs.io/en/latest/reference/issuers.html#issuers)。例子中使用的是 `route53`。
+    用自己的配置修改集群的[证书签发者](https://cert-manager.readthedocs.io/en/latest/reference/issuers.html)。例子中使用的是 `route53`。
     {{< /tip >}}
 
     {{< text yaml >}}
@@ -126,7 +127,7 @@ attribution: Julien Senon
       desiredReplicas: 1
     {{< /text >}}
 
-1. 使用[附件 YAML 中的定义](/blog/2019/custom-ingress-gateway/deployment-custom-ingress.yaml)进行部署。
+1. 使用[附件 YAML 中的定义](/zh/blog/2019/custom-ingress-gateway/deployment-custom-ingress.yaml)进行部署。
 
     {{< tip >}}
     其中类似 `aws-load-balancer-type` 这样的注解，只对 AWS 生效。
@@ -228,4 +229,4 @@ attribution: Julien Senon
       SSL certificate verify ok.
     {{< /text >}}
 
-**恭喜你！** 现在你可以使用自定义的 `istio-custom-gateway` [网关](/docs/reference/config/networking/v1alpha3/gateway/)对象了。
+**恭喜你！** 现在你可以使用自定义的 `istio-custom-gateway` [网关](/zh/docs/reference/config/networking/gateway/)对象了。
